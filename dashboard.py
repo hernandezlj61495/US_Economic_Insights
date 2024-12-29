@@ -1,101 +1,113 @@
-import os
 import sqlite3
-import subprocess
 import pandas as pd
 import numpy as np
 import streamlit as st
 import plotly.express as px
 from prophet import Prophet
-from statsmodels.tsa.arima.model import ARIMA
 from textblob import TextBlob
-from pathlib import Path
 from reportlab.pdfgen import canvas
 import requests
 
-# Ensure database path
-db_path = Path("economic_data.db")
-
-# Database Handling
-if not db_path.exists():
-    st.warning("Database file 'economic_data.db' is missing. Attempting to generate it...")
-    try:
-        subprocess.run(["python3", "data_processing.py"], check=True)
-        st.success("Database successfully generated!")
-    except Exception as e:
-        st.error(f"Failed to generate the database: {e}")
-        st.stop()
-
-# Load data
+@st.cache_data
 def load_data():
-    try:
-        conn = sqlite3.connect(db_path)
-        data = pd.read_sql("SELECT * FROM economic_data", conn)
-        conn.close()
-        return data
-    except Exception as e:
-        st.error(f"Failed to load data from database: {e}")
-        st.stop()
+    conn = sqlite3.connect("economic_data.db")
+    data = pd.read_sql("SELECT * FROM economic_data", conn)
+    conn.close()
+    return data
 
-# Streamlit App
-st.set_page_config(page_title="US Economic Insights Dashboard", page_icon="📊", layout="wide")
-st.title("📊 US Economic Insights Dashboard")
+def generate_pdf(data):
+    c = canvas.Canvas("economic_report.pdf")
+    c.drawString(100, 750, "US Economic Insights Report")
+    avg_gdp = data['gdp_growth'].mean()
+    avg_inflation = data['inflation'].mean()
+    avg_unemployment = data['unemployment'].mean()
+    c.drawString(100, 730, f"Average GDP Growth: {avg_gdp:.2f}%")
+    c.drawString(100, 710, f"Average Inflation Rate: {avg_inflation:.2f}%")
+    c.drawString(100, 690, f"Average Unemployment Rate: {avg_unemployment:.2f}%")
+    c.save()
 
+st.title("US Economic Insights Dashboard")
 data = load_data()
 
-# Visualizations
-st.subheader("Clustered Economic Phases")
-fig1 = px.scatter(data, x="GDP YoY Growth (%)", y="Unemployment Rate (%)", color="Economic Phase Name")
-st.plotly_chart(fig1)
+# Tabs for navigation
+tab1, tab2, tab3, tab4, tab5 = st.tabs([
+    "Visualizations", "Forecasting", "Simulations", "News Sentiment", "Generate Report"
+])
 
-st.subheader("Trends Over Time")
-fig2 = px.line(data, x="year", y=["GDP YoY Growth (%)", "Inflation Rate (%)", "Unemployment Rate (%)"])
-st.plotly_chart(fig2)
+# Visualizations
+with tab1:
+    st.subheader("Economic Trends")
+    fig = px.line(data, x="year", y=["gdp_growth", "inflation", "unemployment"],
+                  labels={"value": "Percentage", "variable": "Indicator"},
+                  title="Economic Indicators Over Time")
+    st.plotly_chart(fig)
+
+    st.subheader("Clustered Economic Phases")
+    if "economic_phase_name" in data.columns:
+        fig2 = px.scatter(data, x="gdp_growth", y="unemployment",
+                          color="economic_phase_name", title="Economic Phases")
+        st.plotly_chart(fig2)
 
 # Forecasting
-st.subheader("Forecasting")
-indicator = st.selectbox("Select Indicator", ["GDP YoY Growth (%)", "Inflation Rate (%)", "Unemployment Rate (%)"])
-if st.button("Prophet Forecast"):
-    try:
-        df = data.rename(columns={"year": "ds", indicator: "y"})
-        model = Prophet()
-        model.fit(df[["ds", "y"]])
-        future = model.make_future_dataframe(periods=10)
-        forecast = model.predict(future)
-        fig3 = px.line(forecast, x="ds", y=["yhat", "yhat_lower", "yhat_upper"])
-        st.plotly_chart(fig3)
-    except Exception as e:
-        st.error(f"Error: {e}")
+with tab2:
+    st.subheader("Forecasting")
+    indicator = st.selectbox("Select Indicator", ["gdp_growth", "inflation", "unemployment"])
+    if st.button("Run Forecast"):
+        try:
+            df = data.rename(columns={"year": "ds", indicator: "y"})
+            model = Prophet()
+            model.fit(df[["ds", "y"]])
+            future = model.make_future_dataframe(periods=10)
+            forecast = model.predict(future)
+            fig3 = px.line(forecast, x="ds", y=["yhat", "yhat_lower", "yhat_upper"],
+                           labels={"ds": "Year", "value": "Forecast"},
+                           title=f"Forecast for {indicator}")
+            st.plotly_chart(fig3)
+        except Exception as e:
+            st.error(f"Forecasting failed: {e}")
 
-# Monte Carlo Simulation
-st.subheader("Monte Carlo Simulation")
-initial = st.number_input("Initial Investment", value=1000)
-growth = st.number_input("Growth Rate (%)", value=5.0)
-years = st.slider("Years", 1, 50, 10)
-results = [initial * (1 + np.random.normal(growth / 100, 0.02)) ** years for _ in range(1000)]
-st.write(f"Median Value: ${np.median(results):,.2f}")
-st.plotly_chart(px.histogram(results))
+# Simulations
+with tab3:
+    st.subheader("Monte Carlo Simulation")
+    initial_investment = st.number_input("Initial Investment ($)", value=1000.0)
+    growth_rate = st.slider("Expected Annual Growth Rate (%)", 0.0, 20.0, 5.0)
+    years = st.slider("Number of Years", 1, 50, 10)
+    simulations = st.number_input("Number of Simulations", value=1000, step=100)
+
+    if st.button("Run Simulation"):
+        results = []
+        for _ in range(simulations):
+            yearly_growth = np.random.normal(growth_rate / 100, 0.02, years)
+            portfolio_value = initial_investment * np.cumprod(1 + yearly_growth)
+            results.append(portfolio_value[-1])
+
+        st.write(f"Median Portfolio Value: ${np.median(results):,.2f}")
+        fig4 = px.histogram(results, nbins=50, title="Monte Carlo Simulation Results")
+        fig4.update_layout(xaxis_title="Portfolio Value ($)", yaxis_title="Frequency")
+        st.plotly_chart(fig4)
 
 # News Sentiment
-st.subheader("Live Economic News Sentiment")
-api_key = "c4cda9e665ab468c8fbbc59df598fca3"
-try:
-    url = f"https://newsapi.org/v2/everything?q=economy&apiKey={api_key}"
-    articles = requests.get(url).json().get("articles", [])
-    for article in articles[:10]:
-        sentiment = TextBlob(article["title"]).sentiment.polarity
-        st.write(f"Title: {article['title']}")
-        st.write(f"Sentiment: {'Positive' if sentiment > 0 else 'Negative' if sentiment < 0 else 'Neutral'}")
-except Exception as e:
-    st.error(f"News API error: {e}")
-
-# Generate PDF
-st.subheader("Generate Report")
-if st.button("Download Report"):
+with tab4:
+    st.subheader("Live News Sentiment Analysis")
+    api_key = "your_news_api_key"  # Replace with your NewsAPI key
     try:
-        c = canvas.Canvas("report.pdf")
-        c.drawString(100, 750, "Economic Report")
-        c.save()
-        with open("report.pdf", "rb") as pdf:
-            st.download_button("Download Report", pdf)
+        url = f"https://newsapi.org/v2/everything?q=economy&apiKey={api_key}"
+        articles = requests.get(url).json().get("articles", [])
+        for article in articles[:5]:
+            sentiment = TextBlob(article["title"]).sentiment.polarity
+            sentiment_label = "Positive" if sentiment > 0 else "Negative" if sentiment < 0 else "Neutral"
+            st.write(f"**{article['title']}** ({sentiment_label})")
+            st.write(article["description"])
     except Exception as e:
-        st.error(f"PDF generation error: {e}")
+        st.error(f"Error fetching news: {e}")
+
+# Generate PDF Report
+with tab5:
+    st.subheader("Generate Economic Report")
+    if st.button("Download Report"):
+        try:
+            generate_pdf(data)
+            with open("economic_report.pdf", "rb") as pdf:
+                st.download_button("Download Report", pdf, file_name="economic_report.pdf")
+        except Exception as e:
+            st.error(f"PDF generation failed: {e}")
