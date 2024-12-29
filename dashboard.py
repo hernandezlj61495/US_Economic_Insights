@@ -16,18 +16,18 @@ NEWSAPI_KEY = "c4cda9e665ab468c8fbbc59df598fca3"
 
 # Check if the database exists, and if not, generate it
 if not os.path.exists('economic_data.db'):
-    st.warning("Database file 'economic_data.db' is missing. Generating it now...")
     try:
-        # Run data_processing.py to generate the database
+        print("Database file 'economic_data.db' is missing. Generating it now...")
         result = subprocess.run(
             ["python3", "data_processing.py"], 
             check=True, 
             capture_output=True, 
             text=True
         )
-        st.success("Database generated successfully!")
+        print("Database generated successfully!")
     except subprocess.CalledProcessError as e:
-        st.error(f"Failed to generate the database. Error: {e.stderr}")
+        print(f"Failed to generate the database. Error: {e.stderr}")
+        st.error("An internal error occurred while generating the database. Please contact the administrator.")
         st.stop()
 
 # Load data from SQLite database
