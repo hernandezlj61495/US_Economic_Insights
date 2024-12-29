@@ -2,7 +2,7 @@ from pandas_datareader import wb
 import pandas as pd
 import sqlite3
 from sklearn.cluster import KMeans
-from prophet import Prophet
+from statsmodels.tsa.arima.model import ARIMA
 
 def fetch_and_process_data():
     """Fetch and process GDP, inflation, and unemployment data."""
@@ -25,12 +25,10 @@ def fetch_and_process_data():
         print(f"Error occurred while fetching data: {e}")
         return pd.DataFrame()  # Return an empty DataFrame if the fetch fails
 
-    # Merge datasets
     print("Merging datasets...")
     economic_data = pd.merge(gdp_df, inflation_df, on=['country', 'year'], how='outer')
     economic_data = pd.merge(economic_data, unemployment_df, on=['country', 'year'], how='outer')
 
-    # Rename columns for clarity
     print("Renaming columns...")
     economic_data.rename(columns={
         'GDP (USD)': 'GDP (USD)',
@@ -38,7 +36,6 @@ def fetch_and_process_data():
         'Unemployment Rate (%)': 'Unemployment Rate (%)'
     }, inplace=True)
 
-    # Calculate GDP YoY Growth
     print("Calculating GDP YoY Growth...")
     economic_data['GDP YoY Growth (%)'] = economic_data['GDP (USD)'].pct_change() * 100
 
@@ -50,18 +47,25 @@ def cluster_economic_phases(data):
     print("Clustering economic phases...")
     features = data[['GDP YoY Growth (%)', 'Inflation Rate (%)', 'Unemployment Rate (%)']].dropna()
 
-    # Perform clustering
     kmeans = KMeans(n_clusters=3, random_state=42)
     clusters = kmeans.fit_predict(features)
 
-    # Create a new column for Economic Phase and align with the original DataFrame
     cluster_labels = {0: 'Recession', 1: 'Recovery', 2: 'Growth'}
-    data['Economic Phase'] = pd.NA  # Initialize with NaN
+    data['Economic Phase'] = pd.NA
     data.loc[features.index, 'Economic Phase'] = clusters
     data['Economic Phase Name'] = data['Economic Phase'].map(cluster_labels)
 
     print("Clustering complete.")
     return data
+
+def arima_forecast(data, column_name, periods=10):
+    """Forecast future trends using ARIMA."""
+    df = data[['year', column_name]].dropna()
+    df.set_index('year', inplace=True)
+    model = ARIMA(df[column_name], order=(1, 1, 0))  # ARIMA(1,1,0)
+    model_fit = model.fit()
+    forecast = model_fit.forecast(steps=periods)
+    return forecast
 
 def save_to_database(data):
     """Save processed data to SQLite database."""
