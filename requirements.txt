@@ -8,3 +8,4 @@ textblob
 statsmodels
 scikit-learn
 requests
+statsmodels
