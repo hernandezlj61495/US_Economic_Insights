@@ -1,87 +1,88 @@
-from pandas_datareader import wb
-import pandas as pd
 import sqlite3
-from sklearn.cluster import KMeans
-from statsmodels.tsa.arima.model import ARIMA
+import pandas as pd
+import numpy as np
 
-def fetch_and_process_data():
-    """Fetch and process GDP, inflation, and unemployment data."""
+# Add your data-fetching and processing imports here (e.g., requests, APIs)
+# Example: import requests
+
+def fetch_gdp_data():
+    """Fetch GDP data (placeholder function)."""
+    print("Fetching GDP data...")
+    # Simulate fetching data (replace this with actual API or file loading logic)
+    gdp_data = pd.DataFrame({
+        "year": range(2000, 2023),
+        "GDP YoY Growth (%)": np.random.uniform(-5, 5, 23)
+    })
+    print("GDP data fetched successfully.")
+    return gdp_data
+
+def fetch_inflation_data():
+    """Fetch Inflation data (placeholder function)."""
+    print("Fetching Inflation data...")
+    # Simulate fetching data
+    inflation_data = pd.DataFrame({
+        "year": range(2000, 2023),
+        "Inflation Rate (%)": np.random.uniform(0, 10, 23)
+    })
+    print("Inflation data fetched successfully.")
+    return inflation_data
+
+def fetch_unemployment_data():
+    """Fetch Unemployment data (placeholder function)."""
+    print("Fetching Unemployment data...")
+    # Simulate fetching data
+    unemployment_data = pd.DataFrame({
+        "year": range(2000, 2023),
+        "Unemployment Rate (%)": np.random.uniform(3, 15, 23)
+    })
+    print("Unemployment data fetched successfully.")
+    return unemployment_data
+
+def process_data():
+    """Fetch and process economic data."""
     try:
-        print("Fetching GDP data...")
-        gdp_df = wb.download(indicator='NY.GDP.MKTP.CD', country='US', start=2000, end=2022)
-        gdp_df.reset_index(inplace=True)
-        gdp_df.rename(columns={'NY.GDP.MKTP.CD': 'GDP (USD)'}, inplace=True)
+        print("Fetching all data...")
+        gdp_data = fetch_gdp_data()
+        inflation_data = fetch_inflation_data()
+        unemployment_data = fetch_unemployment_data()
+        print("All data fetched successfully.")
 
-        print("Fetching Inflation data...")
-        inflation_df = wb.download(indicator='FP.CPI.TOTL', country='US', start=2000, end=2022)
-        inflation_df.reset_index(inplace=True)
-        inflation_df.rename(columns={'FP.CPI.TOTL': 'Inflation Rate (%)'}, inplace=True)
+        print("Merging datasets...")
+        # Merge datasets on 'year'
+        data = pd.merge(gdp_data, inflation_data, on="year")
+        data = pd.merge(data, unemployment_data, on="year")
+        print("Datasets merged successfully.")
 
-        print("Fetching Unemployment data...")
-        unemployment_df = wb.download(indicator='SL.UEM.TOTL.ZS', country='US', start=2000, end=2022)
-        unemployment_df.reset_index(inplace=True)
-        unemployment_df.rename(columns={'SL.UEM.TOTL.ZS': 'Unemployment Rate (%)'}, inplace=True)
+        print("Calculating additional metrics...")
+        # Example: Add a rolling average for GDP
+        data["GDP Rolling Avg (%)"] = data["GDP YoY Growth (%)"].rolling(3).mean()
+        print("Metrics calculated successfully.")
+        
+        return data
+
     except Exception as e:
-        print(f"Error occurred while fetching data: {e}")
-        return pd.DataFrame()  # Return an empty DataFrame if the fetch fails
-
-    print("Merging datasets...")
-    economic_data = pd.merge(gdp_df, inflation_df, on=['country', 'year'], how='outer')
-    economic_data = pd.merge(economic_data, unemployment_df, on=['country', 'year'], how='outer')
-
-    print("Renaming columns...")
-    economic_data.rename(columns={
-        'GDP (USD)': 'GDP (USD)',
-        'Inflation Rate (%)': 'Inflation Rate (%)',
-        'Unemployment Rate (%)': 'Unemployment Rate (%)'
-    }, inplace=True)
-
-    print("Calculating GDP YoY Growth...")
-    economic_data['GDP YoY Growth (%)'] = economic_data['GDP (USD)'].pct_change() * 100
-
-    print("Data processing complete.")
-    return economic_data
-
-def cluster_economic_phases(data):
-    """Clusters economic periods based on GDP, inflation, and unemployment."""
-    print("Clustering economic phases...")
-    features = data[['GDP YoY Growth (%)', 'Inflation Rate (%)', 'Unemployment Rate (%)']].dropna()
-
-    kmeans = KMeans(n_clusters=3, random_state=42)
-    clusters = kmeans.fit_predict(features)
-
-    cluster_labels = {0: 'Recession', 1: 'Recovery', 2: 'Growth'}
-    data['Economic Phase'] = pd.NA
-    data.loc[features.index, 'Economic Phase'] = clusters
-    data['Economic Phase Name'] = data['Economic Phase'].map(cluster_labels)
-
-    print("Clustering complete.")
-    return data
-
-def arima_forecast(data, column_name, periods=10):
-    """Forecast future trends using ARIMA."""
-    df = data[['year', column_name]].dropna()
-    df.set_index('year', inplace=True)
-    model = ARIMA(df[column_name], order=(1, 1, 0))  # ARIMA(1,1,0)
-    model_fit = model.fit()
-    forecast = model_fit.forecast(steps=periods)
-    return forecast
+        print(f"Error during data processing: {e}")
+        raise
 
 def save_to_database(data):
-    """Save processed data to SQLite database."""
+    """Save the processed data to SQLite database."""
     try:
-        print("Saving data to database...")
-        conn = sqlite3.connect('./economic_data.db')
-        data.to_sql('economic_data', conn, if_exists='replace', index=False)
+        print("Saving data to SQLite database...")
+        conn = sqlite3.connect("economic_data.db")
+        data.to_sql("economic_data", conn, if_exists="replace", index=False)
         conn.close()
-        print("Data saved to database successfully!")
+        print("Data saved to database successfully.")
     except Exception as e:
-        print(f"Error occurred while saving to database: {e}")
+        print(f"Error saving data to database: {e}")
+        raise
 
 if __name__ == "__main__":
-    data = fetch_and_process_data()
-    if not data.empty:
-        data = cluster_economic_phases(data)
+    try:
+        print("Starting data processing...")
+        data = process_data()
+        print("Data processing complete.")
+
         save_to_database(data)
-    else:
-        print("No data to save. Please check the API or your internet connection.")
+        print("Database generation complete.")
+    except Exception as e:
+        print(f"Critical error: {e}")
