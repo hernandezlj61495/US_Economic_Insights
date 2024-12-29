@@ -1,17 +1,27 @@
-# Ignore unnecessary system files
-.DS_Store
+# Ignore SQLite database
+economic_data.db
 
-# Ignore Python cache and temporary files
-*.pyc
+# Ignore generated reports
+*.pdf
+
+# Ignore Python cache files
 __pycache__/
+*.pyc
 
 # Ignore log files
 *.log
 nohup.out
+scheduler.log
 
-# Ignore generated files
-*.pdf
+# Ignore Jupyter Notebook checkpoints
+.ipynb_checkpoints/
 
-# Ignore SQLite database if dynamically generated
-economic_data.db
+# Ignore macOS-specific files
+.DS_Store
+
+# Ignore virtual environments
+venv/
+
+# Ignore unnecessary images or temporary directories
+images/
 
