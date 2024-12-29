@@ -1,6 +1,14 @@
+# Log files
 nohup.out
+scheduler.log
+
+# Generated files
 economic_data.db
 economic_report.pdf
-nohup.out
-economic_data.db
-economic_report.pdf
+
+# Jupyter Notebooks (if not essential for the app)
+*.ipynb
+
+# System files
+.DS_Store
+
