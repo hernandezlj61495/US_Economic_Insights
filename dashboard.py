@@ -20,7 +20,7 @@ if not db_path.exists():
         )
         st.success("Database generated successfully!")
     except subprocess.CalledProcessError as e:
-        st.error(f"Failed to generate the database. Error: {e.stderr}")
+        st.error(f"Failed to generate the database. Error details: {e.stderr}")
         st.stop()
 
 def load_data():

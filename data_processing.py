@@ -83,6 +83,7 @@ def save_to_database(data):
         conn = sqlite3.connect(db_path)
         data.to_sql("economic_data", conn, if_exists="replace", index=False)
         conn.close()
+
         print(f"Data saved successfully to {db_path}")
     except Exception as e:
         print(f"Error saving data to database: {e}")
@@ -99,3 +100,4 @@ if __name__ == "__main__":
     except Exception as e:
         print(f"Critical error in data_processing.py: {e}")
         raise
+
