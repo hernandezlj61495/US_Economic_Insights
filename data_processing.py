@@ -1,15 +1,13 @@
+import os
+from pathlib import Path
 import sqlite3
 import pandas as pd
 import numpy as np
 from sklearn.cluster import KMeans
 
-# Add your data-fetching and processing imports here (e.g., requests, APIs)
-# Example: import requests
-
 def fetch_gdp_data():
     """Fetch GDP data (placeholder function)."""
     print("Fetching GDP data...")
-    # Simulate fetching data (replace this with actual API or file loading logic)
     gdp_data = pd.DataFrame({
         "year": range(2000, 2023),
         "GDP YoY Growth (%)": np.random.uniform(-5, 5, 23)
@@ -20,7 +18,6 @@ def fetch_gdp_data():
 def fetch_inflation_data():
     """Fetch Inflation data (placeholder function)."""
     print("Fetching Inflation data...")
-    # Simulate fetching data
     inflation_data = pd.DataFrame({
         "year": range(2000, 2023),
         "Inflation Rate (%)": np.random.uniform(0, 10, 23)
@@ -31,7 +28,6 @@ def fetch_inflation_data():
 def fetch_unemployment_data():
     """Fetch Unemployment data (placeholder function)."""
     print("Fetching Unemployment data...")
-    # Simulate fetching data
     unemployment_data = pd.DataFrame({
         "year": range(2000, 2023),
         "Unemployment Rate (%)": np.random.uniform(3, 15, 23)
@@ -42,17 +38,10 @@ def fetch_unemployment_data():
 def cluster_economic_phases(data):
     """Cluster economic data into phases using KMeans."""
     print("Clustering economic phases...")
-    # Select features for clustering
     features = data[["GDP YoY Growth (%)", "Inflation Rate (%)", "Unemployment Rate (%)"]]
     kmeans = KMeans(n_clusters=3, random_state=42)
     data["Economic Phase"] = kmeans.fit_predict(features)
-    
-    # Map cluster numbers to descriptive names
-    phase_names = {
-        0: "Recession",
-        1: "Growth",
-        2: "Stagflation"
-    }
+    phase_names = {0: "Recession", 1: "Growth", 2: "Stagflation"}
     data["Economic Phase Name"] = data["Economic Phase"].map(phase_names)
     print("Clustering complete.")
     return data
@@ -67,13 +56,11 @@ def process_data():
         print("All data fetched successfully.")
 
         print("Merging datasets...")
-        # Merge datasets on 'year'
         data = pd.merge(gdp_data, inflation_data, on="year")
         data = pd.merge(data, unemployment_data, on="year")
         print("Datasets merged successfully.")
 
         print("Calculating additional metrics...")
-        # Example: Add a rolling average for GDP
         data["GDP Rolling Avg (%)"] = data["GDP YoY Growth (%)"].rolling(3).mean()
         print("Metrics calculated successfully.")
 
@@ -82,19 +69,21 @@ def process_data():
         print("Clustering applied successfully.")
         
         return data
-
     except Exception as e:
         print(f"Error during data processing: {e}")
         raise
 
 def save_to_database(data):
-    """Save the processed data to SQLite database."""
+    """Save the processed data to SQLite database in a temp directory."""
     try:
         print("Saving data to SQLite database...")
-        conn = sqlite3.connect("economic_data.db")
+        temp_dir = Path(os.getenv('STREAMLIT_TEMP_DIR', '.'))
+        db_path = temp_dir / "economic_data.db"
+
+        conn = sqlite3.connect(db_path)
         data.to_sql("economic_data", conn, if_exists="replace", index=False)
         conn.close()
-        print("Data saved to database successfully.")
+        print(f"Data saved successfully to {db_path}")
     except Exception as e:
         print(f"Error saving data to database: {e}")
         raise
@@ -108,4 +97,5 @@ if __name__ == "__main__":
         save_to_database(data)
         print("Database generation complete.")
     except Exception as e:
-        print(f"Critical error: {e}")
+        print(f"Critical error in data_processing.py: {e}")
+        raise

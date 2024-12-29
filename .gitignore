@@ -2,13 +2,12 @@
 nohup.out
 scheduler.log
 
-# Generated files
+# Generated database
 economic_data.db
-economic_report.pdf
-
-# Jupyter Notebooks (if not essential for the app)
-*.ipynb
 
 # System files
 .DS_Store
+
+# Jupyter Notebook checkpoints
+.ipynb_checkpoints/
 
