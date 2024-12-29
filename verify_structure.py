@@ -1,6 +1,5 @@
 import os
 
-# Define the expected structure
 expected_structure = {
     "files": [
         "README.md",
@@ -9,7 +8,7 @@ expected_structure = {
         "db_setup.py",
         "pipeline_scheduler.py",
         "requirements.txt",
-        "visualizations.ipynb",
+        "economic_data.db",
     ],
     "folders": {
         "images": ["correlation_matrix.png", "dashboard_preview.png", "gdp_trends.png"]
@@ -24,22 +23,11 @@ else:
     print("All required files are present!")
 
 # Verify folders and their contents
-missing_folders = []
-missing_folder_files = {}
-
 for folder, files in expected_structure["folders"].items():
     if not os.path.isdir(folder):
-        missing_folders.append(folder)
+        print(f"Folder '{folder}' is missing.")
     else:
-        missing_files_in_folder = [
-            f for f in files if not os.path.isfile(os.path.join(folder, f))
-        ]
-        if missing_files_in_folder:
-            missing_folder_files[folder] = missing_files_in_folder
+        for file in files:
+            if not os.path.isfile(os.path.join(folder, file)):
+                print(f"Missing file: {file} in folder {folder}")
 
-if missing_folders:
-    print("Missing folders:", missing_folders)
-if missing_folder_files:
-    print("Missing files in folders:", missing_folder_files)
-if not missing_folders and not missing_folder_files:
-    print("All folders and files are present!")

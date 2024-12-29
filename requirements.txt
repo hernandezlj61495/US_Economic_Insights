@@ -1,6 +1,7 @@
 pandas
 matplotlib
-seaborsqlite3
+seaborn
 schedule
 streamlit
 plotly
+pandas-datareader

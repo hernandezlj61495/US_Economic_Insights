@@ -1,21 +1,40 @@
 import schedule
 import time
 import subprocess
+import logging
+
+# Setup logging to file and console
+logging.basicConfig(
+    filename='scheduler.log',
+    level=logging.INFO,
+    format='%(asctime)s - %(levelname)s - %(message)s'
+)
+console = logging.StreamHandler()
+console.setLevel(logging.INFO)
+formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
+console.setFormatter(formatter)
+logging.getLogger().addHandler(console)
 
 # Define the update process
 def update_data():
-    print("Running data update...")  # Debugging output
+    logging.info("Running data update...")  # Log start of update
     try:
-        subprocess.run(['python3', 'data_processing.py'], check=True)
-        print("Data updated successfully!")
+        result = subprocess.run(['python3', 'data_processing.py'], check=True, capture_output=True, text=True)
+        logging.info(f"Data updated successfully! Output:\n{result.stdout}")
+    except subprocess.CalledProcessError as e:
+        logging.error(f"Error occurred while updating data: {e.stderr}")
     except Exception as e:
-        print(f"Error occurred while updating data: {e}")
+        logging.error(f"Unexpected error: {e}")
 
 # Schedule the update to run every minute for testing
-schedule.every(1).minutes.do(update_data)
+schedule.every().day.at("00:00").do(update_data)  # Change to .day.at("00:00") for daily updates in deployment
 
-print("Scheduler is running. Press Ctrl+C to stop.")
-while True:
-    schedule.run_pending()
-    print("Waiting for the next scheduled task...")  # Debugging output
-    time.sleep(10)  # Adjust the sleep interval for quicker checks
+logging.info("Scheduler started. Waiting for tasks...")
+
+# Scheduler infinite loop
+try:
+    while True:
+        schedule.run_pending()
+        time.sleep(10)  # Adjust sleep interval for quicker testing
+except KeyboardInterrupt:
+    logging.info("Scheduler stopped manually.")
