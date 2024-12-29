@@ -1,32 +1,39 @@
 import os
-import streamlit as st
-import pandas as pd
+import subprocess
 import sqlite3
-import plotly.express as px
+import pandas as pd
 import numpy as np
+import streamlit as st
+import plotly.express as px
 from prophet import Prophet
 from statsmodels.tsa.arima.model import ARIMA
-from reportlab.pdfgen import canvas
 from textblob import TextBlob
+from reportlab.pdfgen import canvas
 import requests
 
-# NewsAPI key
+# NewsAPI Key
 NEWSAPI_KEY = "c4cda9e665ab468c8fbbc59df598fca3"
+
+# Check if the database exists, and if not, generate it
+if not os.path.exists('economic_data.db'):
+    st.warning("Database file 'economic_data.db' is missing. Generating it now...")
+    try:
+        subprocess.run(["python3", "data_processing.py"], check=True)
+        st.success("Database generated successfully!")
+    except Exception as e:
+        st.error(f"Failed to generate the database. Error: {e}")
+        st.stop()
 
 # Load data from SQLite database
 def load_data():
     try:
-        if not os.path.exists('economic_data.db'):
-            st.error("Database file 'economic_data.db' is missing. Please run `data_processing.py` to generate it.")
-            st.stop()
-
-        conn = sqlite3.connect('./economic_data.db')
+        conn = sqlite3.connect('economic_data.db')
         data = pd.read_sql('SELECT * FROM economic_data', conn)
         conn.close()
         return data
     except Exception as e:
         st.error(f"Error loading data: {e}")
-        return pd.DataFrame()
+        st.stop()
 
 # Forecasting Functions
 def forecast_indicator(data, column_name, periods=10):
@@ -43,7 +50,7 @@ def arima_forecast(data, column_name, periods=10):
     """Forecast future trends using ARIMA."""
     df = data[['year', column_name]].dropna()
     df.set_index('year', inplace=True)
-    model = ARIMA(df[column_name], order=(1, 1, 0))  # ARIMA(1,1,0)
+    model = ARIMA(df[column_name], order=(1, 1, 0))
     model_fit = model.fit()
     forecast = model_fit.forecast(steps=periods)
     return forecast
@@ -107,10 +114,6 @@ def fetch_news(api_key, query='economy', max_results=5):
 # Main App
 st.title('US Economic Insights Dashboard')
 economic_data = load_data()
-
-if economic_data.empty:
-    st.error("No data available. Please populate the database by running `data_processing.py`.")
-    st.stop()
 
 # Clustered Economic Phases
 st.subheader('Clustered Economic Phases')
