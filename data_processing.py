@@ -1,6 +1,7 @@
 import sqlite3
 import pandas as pd
 import numpy as np
+from sklearn.cluster import KMeans
 
 # Add your data-fetching and processing imports here (e.g., requests, APIs)
 # Example: import requests
@@ -38,6 +39,24 @@ def fetch_unemployment_data():
     print("Unemployment data fetched successfully.")
     return unemployment_data
 
+def cluster_economic_phases(data):
+    """Cluster economic data into phases using KMeans."""
+    print("Clustering economic phases...")
+    # Select features for clustering
+    features = data[["GDP YoY Growth (%)", "Inflation Rate (%)", "Unemployment Rate (%)"]]
+    kmeans = KMeans(n_clusters=3, random_state=42)
+    data["Economic Phase"] = kmeans.fit_predict(features)
+    
+    # Map cluster numbers to descriptive names
+    phase_names = {
+        0: "Recession",
+        1: "Growth",
+        2: "Stagflation"
+    }
+    data["Economic Phase Name"] = data["Economic Phase"].map(phase_names)
+    print("Clustering complete.")
+    return data
+
 def process_data():
     """Fetch and process economic data."""
     try:
@@ -57,6 +76,10 @@ def process_data():
         # Example: Add a rolling average for GDP
         data["GDP Rolling Avg (%)"] = data["GDP YoY Growth (%)"].rolling(3).mean()
         print("Metrics calculated successfully.")
+
+        print("Applying clustering...")
+        data = cluster_economic_phases(data)
+        print("Clustering applied successfully.")
         
         return data
 
