@@ -1,10 +1,11 @@
 streamlit
 pandas
 numpy
-plotly
-prophet
-textblob
+sqlite3
 scikit-learn
 statsmodels
+prophet
+textblob
+plotly
 reportlab
 requests

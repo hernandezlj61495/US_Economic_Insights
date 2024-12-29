@@ -1,14 +1,17 @@
-# Log files
-nohup.out
-scheduler.log
-
-# Generated database
-economic_data.db
-
-# System files
+# Ignore unnecessary system files
 .DS_Store
 
-# Jupyter Notebook checkpoints
-.ipynb_checkpoints/
+# Ignore Python cache and temporary files
+*.pyc
+__pycache__/
 
+# Ignore log files
+*.log
+nohup.out
+
+# Ignore generated files
+*.pdf
+
+# Ignore SQLite database if dynamically generated
+economic_data.db
 

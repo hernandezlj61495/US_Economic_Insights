@@ -3,19 +3,12 @@ import pandas as pd
 from sklearn.cluster import KMeans
 
 # Function to fetch economic data
-def fetch_data():  # Replace this function in your script
-    # Fixed: Ensure all arrays are the same length
+def fetch_data():
+    # Ensure all arrays are the same length
     years = list(range(2000, 2023))  # 23 years of data
-
-    # Create dummy data with consistent lengths
-    gdp_growth = [-1, 2, 3] * (len(years) // 3)  # Repeat pattern
-    gdp_growth += [-1] * (len(years) - len(gdp_growth))  # Pad to match `years`
-
-    inflation = [3, 4, 5] * (len(years) // 3)
-    inflation += [3] * (len(years) - len(inflation))  # Pad to match `years`
-
-    unemployment = [5, 6, 7] * (len(years) // 3)
-    unemployment += [5] * (len(years) - len(unemployment))  # Pad to match `years`
+    gdp_growth = [-1, 2, 3] * (len(years) // 3) + [-1]  # Repeat and pad to match length
+    inflation = [3, 4, 5] * (len(years) // 3) + [3]
+    unemployment = [5, 6, 7] * (len(years) // 3) + [5]
 
     # Create the DataFrame
     data = {
@@ -44,9 +37,7 @@ def write_to_db(data):
 # Main script
 if __name__ == "__main__":
     try:
-        raw_data = fetch_data()  # Fetch the data
-        processed_data = process_data(raw_data)  # Process the data
-        write_to_db(processed_data)  # Save to SQLite database
-        print("Database successfully created!")
-    except Exception as e:
-        print(f"Error during data processing: {e}")
+        raw_data = fetch_data()
+        processed_data = process_data(raw_data)
+        write_to_db(processed_data)
+        print("Database succes
