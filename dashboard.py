@@ -122,17 +122,43 @@ with tab3:
 
 with tab4:
     st.subheader("Live News Sentiment Analysis")
-    api_key = "your_news_api_key"  # Replace with your NewsAPI key
+
+    # Description of the feature
+    st.write("""
+        This feature retrieves the latest news articles about the economy and analyzes the sentiment 
+        of their headlines. Positive, negative, or neutral sentiments provide insights into the current 
+        perception of economic events in the media.
+    """)
+
+    # Using your NewsAPI key
+    api_key = "c4cda9e665ab468c8fbbc59df598fca3"
+    url = f"https://newsapi.org/v2/everything?q=economy&language=en&sortBy=publishedAt&apiKey={api_key}"
+
     try:
-        url = f"https://newsapi.org/v2/everything?q=economy&apiKey={api_key}"
-        articles = requests.get(url).json().get("articles", [])
-        for article in articles[:5]:
-            sentiment = TextBlob(article["title"]).sentiment.polarity
-            sentiment_label = "Positive" if sentiment > 0 else "Negative" if sentiment < 0 else "Neutral"
-            st.write(f"**{article['title']}** ({sentiment_label})")
-            st.write(article["description"])
-    except Exception as e:
-        st.error(f"Error fetching news: {e}")
+        # Fetching the news articles
+        response = requests.get(url)
+        response.raise_for_status()  # Raise an error for HTTP issues
+        articles = response.json().get("articles", [])
+
+        if articles:
+            for article in articles[:5]:  # Display the top 5 articles
+                title = article.get("title", "No title available")
+                description = article.get("description", "No description available")
+                url = article.get("url", "")
+
+                # Analyze sentiment of the article's title
+                sentiment_score = TextBlob(title).sentiment.polarity
+                sentiment_label = "Positive" if sentiment_score > 0 else "Negative" if sentiment_score < 0 else "Neutral"
+
+                # Display the article with its sentiment
+                st.write(f"**[{title}]({url})** ({sentiment_label})")
+                st.write(f"*{description}*")
+                st.write("---")  # Divider
+        else:
+            st.write("No news articles found for the query.")
+    except requests.exceptions.RequestException as e:
+        st.error(f"Failed to fetch news: {e}")
+
 
 with tab5:
     st.subheader("Generate Economic Report")
