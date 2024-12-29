@@ -3,9 +3,8 @@ pandas
 numpy
 plotly
 prophet
-reportlab
 textblob
-statsmodels
 scikit-learn
-requests
 statsmodels
+reportlab
+requests
