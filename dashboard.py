@@ -5,12 +5,13 @@ import sqlite3
 import plotly.express as px
 import numpy as np
 from prophet import Prophet
+from statsmodels.tsa.arima.model import ARIMA
 from reportlab.pdfgen import canvas
 from textblob import TextBlob
 import requests
 
 # NewsAPI key
-NEWSAPI_KEY = "c4cda9e665ab468c8fbbc59df598fca3"  # Replace with environment variable later if needed
+NEWSAPI_KEY = "c4cda9e665ab468c8fbbc59df598fca3"
 
 # Load data from SQLite database
 def load_data():
@@ -27,8 +28,9 @@ def load_data():
         st.error(f"Error loading data: {e}")
         return pd.DataFrame()
 
-# Forecasting Function
+# Forecasting Functions
 def forecast_indicator(data, column_name, periods=10):
+    """Forecast future trends using Prophet."""
     df = data[['year', column_name]].dropna()
     df.rename(columns={'year': 'ds', column_name: 'y'}, inplace=True)
     model = Prophet()
@@ -37,8 +39,18 @@ def forecast_indicator(data, column_name, periods=10):
     forecast = model.predict(future)
     return forecast[['ds', 'yhat', 'yhat_lower', 'yhat_upper']]
 
+def arima_forecast(data, column_name, periods=10):
+    """Forecast future trends using ARIMA."""
+    df = data[['year', column_name]].dropna()
+    df.set_index('year', inplace=True)
+    model = ARIMA(df[column_name], order=(1, 1, 0))  # ARIMA(1,1,0)
+    model_fit = model.fit()
+    forecast = model_fit.forecast(steps=periods)
+    return forecast
+
 # Monte Carlo Simulation for Multi-Asset
 def monte_carlo_multi_asset(initial_investment, asset_allocations, years, num_simulations=1000):
+    """Simulate portfolio growth under different conditions."""
     results = []
     for _ in range(num_simulations):
         portfolio_value = initial_investment
@@ -50,39 +62,39 @@ def monte_carlo_multi_asset(initial_investment, asset_allocations, years, num_si
 
 # PDF Report Generator
 def generate_report(filename, data, monte_carlo_results=None):
+    """Generate a professional PDF report."""
     c = canvas.Canvas(filename)
     c.setFont("Helvetica-Bold", 16)
-    c.drawString(100, 800, "US Economic Insights Report")
+    c.drawString(100, 750, "US Economic Insights Report")
 
     c.setFont("Helvetica", 12)
-    c.drawString(100, 780, "Key Economic Indicators:")
+    c.drawString(100, 730, "Key Economic Indicators:")
 
+    # Add summary statistics
     gdp_growth_mean = data['GDP YoY Growth (%)'].mean()
     inflation_mean = data['Inflation Rate (%)'].mean()
     unemployment_mean = data['Unemployment Rate (%)'].mean()
 
-    c.drawString(100, 760, f"- Average GDP Growth: {gdp_growth_mean:.2f}%")
-    c.drawString(100, 740, f"- Average Inflation Rate: {inflation_mean:.2f}%")
-    c.drawString(100, 720, f"- Average Unemployment Rate: {unemployment_mean:.2f}%")
+    c.drawString(100, 710, f"- Average GDP Growth: {gdp_growth_mean:.2f}%")
+    c.drawString(100, 690, f"- Average Inflation Rate: {inflation_mean:.2f}%")
+    c.drawString(100, 670, f"- Average Unemployment Rate: {unemployment_mean:.2f}%")
 
-    c.drawString(100, 700, "Clustering Summary:")
-    cluster_counts = data['Economic Phase Name'].value_counts().to_dict()
-    for cluster, count in cluster_counts.items():
-        c.drawString(120, 680 - (20 * list(cluster_counts.keys()).index(cluster)), f"- {cluster}: {count} periods")
-
+    # Add Monte Carlo results
     if monte_carlo_results:
         median_value = np.median(monte_carlo_results)
-        c.drawString(100, 580, "Monte Carlo Simulation Results:")
-        c.drawString(120, 560, f"- Median Portfolio Value: ${median_value:,.2f}")
-        c.drawString(120, 540, f"- 10th Percentile: ${np.percentile(monte_carlo_results, 10):,.2f}")
-        c.drawString(120, 520, f"- 90th Percentile: ${np.percentile(monte_carlo_results, 90):,.2f}")
+        c.drawString(100, 650, "Monte Carlo Simulation Results:")
+        c.drawString(120, 630, f"- Median Portfolio Value: ${median_value:,.2f}")
+        c.drawString(120, 610, f"- 10th Percentile: ${np.percentile(monte_carlo_results, 10):,.2f}")
+        c.drawString(120, 590, f"- 90th Percentile: ${np.percentile(monte_carlo_results, 90):,.2f}")
 
+    # Final note
     c.setFont("Helvetica", 10)
-    c.drawString(100, 480, "Report generated automatically by the US Economic Insights Dashboard.")
+    c.drawString(100, 570, "Report generated automatically by the US Economic Insights Dashboard.")
     c.save()
 
 # Fetch Live News
 def fetch_news(api_key, query='economy', max_results=5):
+    """Fetch live economic news headlines."""
     url = f"https://newsapi.org/v2/everything?q={query}&apiKey={api_key}&pageSize={max_results}"
     response = requests.get(url)
     if response.status_code == 200:
@@ -107,7 +119,7 @@ fig = px.scatter(
     x='GDP YoY Growth (%)',
     y='Unemployment Rate (%)',
     color='Economic Phase Name',
-    title='Clustered Economic Phases with Labels'
+    title='Clustered Economic Phases'
 )
 st.plotly_chart(fig)
 
@@ -119,33 +131,16 @@ indicator = st.selectbox(
 )
 
 if indicator:
-    forecast = forecast_indicator(economic_data, indicator, periods=10)
-    st.write(f"Forecast for {indicator}")
-    fig = px.line(
-        forecast,
-        x='ds',
-        y='yhat',
-        title=f'Forecast for {indicator}',
-        labels={'ds': 'Year', 'yhat': f'Forecasted {indicator}'}
-    )
-    fig.add_scatter(
-        x=forecast['ds'], 
-        y=forecast['yhat_lower'], 
-        mode='lines', 
-        name='Lower Bound', 
-        line=dict(dash='dot')
-    )
-    fig.add_scatter(
-        x=forecast['ds'], 
-        y=forecast['yhat_upper'], 
-        mode='lines', 
-        name='Upper Bound', 
-        line=dict(dash='dot')
-    )
-    st.plotly_chart(fig)
+    st.write(f"ARIMA Forecast for {indicator}:")
+    arima_values = arima_forecast(economic_data, indicator)
+    st.write(arima_values)
+
+    st.write(f"Prophet Forecast for {indicator}:")
+    prophet_values = forecast_indicator(economic_data, indicator)
+    st.write(prophet_values)
 
 # Monte Carlo Simulation Section
-st.subheader("Multi-Asset Portfolio Growth Simulator")
+st.subheader("Portfolio Growth Simulator")
 initial_investment = st.number_input('Initial Investment ($)', min_value=1000, step=100)
 stocks_allocation = st.slider("Stocks Allocation (%)", 0, 100, 60)
 bonds_allocation = st.slider("Bonds Allocation (%)", 0, 100, 40)
