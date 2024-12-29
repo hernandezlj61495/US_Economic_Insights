@@ -7,6 +7,10 @@ import numpy as np
 from prophet import Prophet
 from reportlab.pdfgen import canvas
 from textblob import TextBlob
+import requests
+
+# NewsAPI key
+NEWSAPI_KEY = "c4cda9e665ab468c8fbbc59df598fca3"  # Replace with environment variable later if needed
 
 # Load data from SQLite database
 def load_data():
@@ -25,7 +29,6 @@ def load_data():
 
 # Forecasting Function
 def forecast_indicator(data, column_name, periods=10):
-    """Forecast future trends for an economic indicator."""
     df = data[['year', column_name]].dropna()
     df.rename(columns={'year': 'ds', column_name: 'y'}, inplace=True)
     model = Prophet()
@@ -34,20 +37,19 @@ def forecast_indicator(data, column_name, periods=10):
     forecast = model.predict(future)
     return forecast[['ds', 'yhat', 'yhat_lower', 'yhat_upper']]
 
-# Monte Carlo Simulation Function
-def monte_carlo_simulation(initial_investment, growth_rate, years, num_simulations=1000):
-    """Run Monte Carlo simulations for portfolio growth."""
+# Monte Carlo Simulation for Multi-Asset
+def monte_carlo_multi_asset(initial_investment, asset_allocations, years, num_simulations=1000):
     results = []
     for _ in range(num_simulations):
-        simulated_growth = initial_investment
+        portfolio_value = initial_investment
         for year in range(years):
-            simulated_growth *= (1 + np.random.normal(growth_rate / 100, 0.02))  # Randomized growth
-        results.append(simulated_growth)
+            for asset, (allocation, growth_rate) in asset_allocations.items():
+                portfolio_value += (portfolio_value * allocation) * np.random.normal(growth_rate / 100, 0.02)
+        results.append(portfolio_value)
     return results
 
 # PDF Report Generator
 def generate_report(filename, data, monte_carlo_results=None):
-    """Generate a PDF report with insights from the dashboard."""
     c = canvas.Canvas(filename)
     c.setFont("Helvetica-Bold", 16)
     c.drawString(100, 800, "US Economic Insights Report")
@@ -55,7 +57,6 @@ def generate_report(filename, data, monte_carlo_results=None):
     c.setFont("Helvetica", 12)
     c.drawString(100, 780, "Key Economic Indicators:")
 
-    # Extract and print summary stats
     gdp_growth_mean = data['GDP YoY Growth (%)'].mean()
     inflation_mean = data['Inflation Rate (%)'].mean()
     unemployment_mean = data['Unemployment Rate (%)'].mean()
@@ -64,13 +65,11 @@ def generate_report(filename, data, monte_carlo_results=None):
     c.drawString(100, 740, f"- Average Inflation Rate: {inflation_mean:.2f}%")
     c.drawString(100, 720, f"- Average Unemployment Rate: {unemployment_mean:.2f}%")
 
-    # Add a clustering summary
     c.drawString(100, 700, "Clustering Summary:")
-    cluster_counts = data['Economic Phase'].value_counts().to_dict()
+    cluster_counts = data['Economic Phase Name'].value_counts().to_dict()
     for cluster, count in cluster_counts.items():
-        c.drawString(120, 680 - (20 * cluster), f"- Cluster {cluster}: {count} periods")
+        c.drawString(120, 680 - (20 * list(cluster_counts.keys()).index(cluster)), f"- {cluster}: {count} periods")
 
-    # Add Monte Carlo Simulation Summary if available
     if monte_carlo_results:
         median_value = np.median(monte_carlo_results)
         c.drawString(100, 580, "Monte Carlo Simulation Results:")
@@ -78,18 +77,20 @@ def generate_report(filename, data, monte_carlo_results=None):
         c.drawString(120, 540, f"- 10th Percentile: ${np.percentile(monte_carlo_results, 10):,.2f}")
         c.drawString(120, 520, f"- 90th Percentile: ${np.percentile(monte_carlo_results, 90):,.2f}")
 
-    # Final note
     c.setFont("Helvetica", 10)
     c.drawString(100, 480, "Report generated automatically by the US Economic Insights Dashboard.")
-    
-    # Save the PDF
     c.save()
 
-# Sentiment Analysis Function
-def analyze_headlines(headlines):
-    """Perform sentiment analysis on economic news headlines."""
-    sentiments = [TextBlob(headline).sentiment.polarity for headline in headlines]
-    return sentiments
+# Fetch Live News
+def fetch_news(api_key, query='economy', max_results=5):
+    url = f"https://newsapi.org/v2/everything?q={query}&apiKey={api_key}&pageSize={max_results}"
+    response = requests.get(url)
+    if response.status_code == 200:
+        articles = response.json().get('articles', [])
+        return [article['title'] for article in articles]
+    else:
+        st.error("Failed to fetch news. Check your API key or query.")
+        return []
 
 # Main App
 st.title('US Economic Insights Dashboard')
@@ -105,8 +106,8 @@ fig = px.scatter(
     economic_data,
     x='GDP YoY Growth (%)',
     y='Unemployment Rate (%)',
-    color='Economic Phase',
-    title='Clustered Economic Phases'
+    color='Economic Phase Name',
+    title='Clustered Economic Phases with Labels'
 )
 st.plotly_chart(fig)
 
@@ -144,30 +145,29 @@ if indicator:
     st.plotly_chart(fig)
 
 # Monte Carlo Simulation Section
-st.subheader("Portfolio Growth Simulator")
+st.subheader("Multi-Asset Portfolio Growth Simulator")
 initial_investment = st.number_input('Initial Investment ($)', min_value=1000, step=100)
-growth_rate = st.slider('Expected Annual Growth Rate (%)', 0, 15, 7)
+stocks_allocation = st.slider("Stocks Allocation (%)", 0, 100, 60)
+bonds_allocation = st.slider("Bonds Allocation (%)", 0, 100, 40)
 years = st.slider('Investment Period (Years)', 1, 50, 10)
 
-if st.button("Run Monte Carlo Simulation"):
-    results = monte_carlo_simulation(initial_investment, growth_rate, years)
-    median_value = np.median(results)
-    st.write(f"After {years} years, the median portfolio value is **${median_value:,.2f}**.")
-    st.write(f"10th Percentile: **${np.percentile(results, 10):,.2f}**")
-    st.write(f"90th Percentile: **${np.percentile(results, 90):,.2f}**")
+if stocks_allocation + bonds_allocation > 100:
+    st.error("Total allocation cannot exceed 100%")
+else:
+    asset_allocations = {
+        "Stocks": (stocks_allocation / 100, 8),
+        "Bonds": (bonds_allocation / 100, 3),
+    }
+    if st.button("Run Monte Carlo Simulation"):
+        results = monte_carlo_multi_asset(initial_investment, asset_allocations, years)
+        st.write(f"Median Portfolio Value: **${np.median(results):,.2f}**")
+        fig = px.histogram(results, nbins=50, title="Portfolio Value Distribution")
+        st.plotly_chart(fig)
 
-    # Monte Carlo Distribution Plot
-    fig = px.histogram(results, nbins=50, title="Portfolio Value Distribution")
-    st.plotly_chart(fig)
-
-# Sentiment Analysis
-st.subheader("Economic News Sentiment")
-headlines = [
-    "Fed raises interest rates to curb inflation",
-    "Unemployment hits record low",
-    "Stock market experiences turbulence",
-]
-sentiments = analyze_headlines(headlines)
+# Live Sentiment Analysis
+st.subheader("Live Economic News Sentiment")
+headlines = fetch_news(NEWSAPI_KEY)
+sentiments = [TextBlob(headline).sentiment.polarity for headline in headlines]
 for headline, sentiment in zip(headlines, sentiments):
     sentiment_label = 'Positive' if sentiment > 0 else 'Negative' if sentiment < 0 else 'Neutral'
     st.write(f'"{headline}" - Sentiment: {sentiment_label}')
@@ -175,8 +175,7 @@ for headline, sentiment in zip(headlines, sentiments):
 # PDF Report Generation
 st.subheader("Download Economic Report")
 if st.button("Generate Report"):
-    # Include Monte Carlo results if they exist
-    monte_carlo_results = monte_carlo_simulation(initial_investment, growth_rate, years) if initial_investment > 0 else None
+    monte_carlo_results = monte_carlo_multi_asset(initial_investment, asset_allocations, years) if initial_investment > 0 else None
     generate_report("economic_report.pdf", economic_data, monte_carlo_results)
     with open("economic_report.pdf", "rb") as f:
         st.download_button("Download Report", f, file_name="economic_report.pdf")

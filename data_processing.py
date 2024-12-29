@@ -48,7 +48,6 @@ def fetch_and_process_data():
 def cluster_economic_phases(data):
     """Clusters economic periods based on GDP, inflation, and unemployment."""
     print("Clustering economic phases...")
-    # Select features and drop rows with missing values
     features = data[['GDP YoY Growth (%)', 'Inflation Rate (%)', 'Unemployment Rate (%)']].dropna()
 
     # Perform clustering
@@ -56,23 +55,13 @@ def cluster_economic_phases(data):
     clusters = kmeans.fit_predict(features)
 
     # Create a new column for Economic Phase and align with the original DataFrame
+    cluster_labels = {0: 'Recession', 1: 'Recovery', 2: 'Growth'}
     data['Economic Phase'] = pd.NA  # Initialize with NaN
-    data.loc[features.index, 'Economic Phase'] = clusters  # Assign clusters to the matching rows
+    data.loc[features.index, 'Economic Phase'] = clusters
+    data['Economic Phase Name'] = data['Economic Phase'].map(cluster_labels)
 
     print("Clustering complete.")
     return data
-
-def forecast_indicator(data, column_name, periods=10):
-    """Forecasts future values for a specific economic indicator."""
-    print(f"Forecasting {column_name}...")
-    df = data[['year', column_name]].dropna()
-    df.rename(columns={'year': 'ds', column_name: 'y'}, inplace=True)
-    model = Prophet()
-    model.fit(df)
-    future = model.make_future_dataframe(periods=periods, freq='Y')
-    forecast = model.predict(future)
-    print(f"Forecasting {column_name} complete.")
-    return forecast[['ds', 'yhat', 'yhat_lower', 'yhat_upper']]
 
 def save_to_database(data):
     """Save processed data to SQLite database."""
@@ -86,13 +75,9 @@ def save_to_database(data):
         print(f"Error occurred while saving to database: {e}")
 
 if __name__ == "__main__":
-    # Fetch and process data
     data = fetch_and_process_data()
     if not data.empty:
-        # Add clustering
         data = cluster_economic_phases(data)
-
-        # Save to database
         save_to_database(data)
     else:
         print("No data to save. Please check the API or your internet connection.")

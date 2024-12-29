@@ -1,7 +1,9 @@
-pandas
-matplotlib
-seaborn
-schedule
 streamlit
+pandas
+numpy
 plotly
-pandas-datareader
+prophet
+reportlab
+textblob
+requests
+scikit-learn
