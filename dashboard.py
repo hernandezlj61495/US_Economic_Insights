@@ -4,15 +4,44 @@ import numpy as np
 import plotly.express as px
 import streamlit as st
 from sklearn.cluster import KMeans
+from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
 from prophet import Prophet
 from textblob import TextBlob
 from reportlab.pdfgen import canvas
 import requests
 import matplotlib.pyplot as plt
+from collections import Counter
+from nltk.corpus import stopwords
+from wordcloud import WordCloud
+import nltk
+
+nltk.download("stopwords")
 
 # Suppress sklearn FutureWarnings
 import warnings
 warnings.filterwarnings("ignore", category=FutureWarning, module="sklearn")
+
+# Custom CSS for styling
+st.markdown("""
+    <style>
+        .main {
+            background-color: #f0f4fc; /* Light blue for main background */
+            color: #222222; /* Darker text color for contrast */
+        }
+        h1, h2, h3, h4, h5 {
+            color: #00509e; /* Navy blue for headings */
+        }
+        .stButton>button {
+            background-color: #00509e; /* Navy blue buttons */
+            color: white;
+            border-radius: 10px;
+            padding: 10px;
+        }
+        .css-1d391kg {
+            background-color: #f7faff; /* Very light blue for sidebar */
+        }
+    </style>
+""", unsafe_allow_html=True)
 
 # Fetch Data Function
 def fetch_data(live_data=False):
@@ -104,10 +133,10 @@ def analyze_sentiment():
             sentiment_score = TextBlob(title).sentiment.polarity
             sentiments.append(sentiment_score)
         avg_sentiment = np.mean(sentiments)
-        return avg_sentiment
+        return sentiments, avg_sentiment, articles
     except Exception as e:
         st.error(f"Error fetching sentiment: {e}")
-        return 0  # Neutral fallback sentiment
+        return [], 0, []  # Neutral fallback sentiment
 
 # Main Dashboard Implementation
 live_data = st.sidebar.checkbox("Use Live Data", value=False)
@@ -118,7 +147,7 @@ tabs = st.tabs(["Overview", "Visualizations", "Forecasting", "Simulations", "Liv
 
 # Overview Tab
 with tabs[0]:
-    st.image("banner.jpg", use_container_width=True)
+    st.image("banner.jpg", use_container_width=True)  # Updated banner image
     st.markdown("""
     ### Welcome to the US Economic Insights Dashboard
     This dashboard provides:
@@ -136,7 +165,7 @@ with tabs[0]:
     gdp_growth = current_data["gdp_growth"]
     inflation = current_data["inflation"]
     unemployment = current_data["unemployment"]
-    avg_sentiment = analyze_sentiment()
+    sentiments, avg_sentiment, _ = analyze_sentiment()
 
     gdp_score = np.clip((gdp_growth - 1) / (5 - 1) * 100, 0, 100)
     inflation_score = np.clip((4 - inflation) / (4 - 2) * 100, 0, 100)
@@ -160,21 +189,111 @@ with tabs[1]:
                   title="Economic Indicators Over Time")
     st.plotly_chart(fig)
 
+
 # Forecasting Tab
 with tabs[2]:
-    st.subheader("Forecasting")
-    indicator = st.selectbox("Select Indicator", ["gdp_growth", "inflation", "unemployment"])
-    forecast_horizon = st.slider("Forecast Horizon (Years)", 1, 20, 10)
-    if st.button("Run Forecast"):
-        df = data.rename(columns={"year": "ds", indicator: "y"})
-        model = Prophet()
-        model.fit(df[["ds", "y"]])
-        future = model.make_future_dataframe(periods=forecast_horizon)
-        forecast = model.predict(future)
-        fig = px.line(forecast, x="ds", y=["yhat", "yhat_lower", "yhat_upper"],
-                      labels={"ds": "Year", "value": "Forecast"},
-                      title=f"Forecast for {indicator.capitalize()}")
-        st.plotly_chart(fig)
+    st.subheader("Forecasting: How Economic Trends Impact You")
+
+    # Section Introduction
+    st.markdown("""
+    This section provides insights into key economic indicators such as Inflation, Unemployment, and Wage Growth. 
+    It uses advanced machine learning algorithms and real-time data to provide actionable insights.
+    """)
+
+    # Overview of Calculations and Estimates
+    st.markdown("""
+    ### Key Calculations and Estimates:
+    - **Disposable Income**: Calculated from your input income and expenses.
+    - **Savings Impact**: Adjusted based on inflation forecasts to protect purchasing power.
+    - **Wage Growth Opportunities**: Projects potential increases in income based on trends.
+    - **Emergency Fund Recommendations**: Aligns with unemployment forecasts for financial security.
+    - **Investment Guidance**: Leverages risk analysis to suggest stable or high-growth sectors.
+    """)
+
+    # Input User Financial Data
+    st.markdown("### Personal Financial Data")
+    yearly_income = st.number_input("Enter Your Yearly Income ($):", min_value=0, value=50000)
+    monthly_expenses = st.number_input("Enter Your Monthly Expenses ($):", min_value=0, value=2000)
+    savings = st.number_input("Enter Your Total Savings ($):", min_value=0, value=10000)
+
+    disposable_income = yearly_income - (monthly_expenses * 12)
+    st.markdown(f"### Your Disposable Income: ${disposable_income:.2f}")
+
+    # Select Indicator
+    st.markdown("### Select an Economic Indicator to Explore")
+    indicator = st.selectbox(
+        "Choose an Indicator",
+        options=["inflation", "unemployment", "wage_growth"],
+        format_func=lambda x: {
+            "inflation": "Inflation",
+            "unemployment": "Unemployment",
+            "wage_growth": "Wage Growth"
+        }.get(x, x),
+    )
+
+    # Forecast Horizon Slider
+    forecast_horizon = st.slider("Forecast Horizon (Years)", 1, 10, 5)
+
+    if st.button("Run Forecast and Get Recommendations"):
+        # Prepare data for Prophet
+        st.markdown("### Personalized Financial Recommendations")
+
+        if indicator not in data.columns:
+            st.error(f"The selected indicator '{indicator}' is not available in the dataset.")
+        else:
+            df = data.rename(columns={"year": "ds", indicator: "y"})
+            model = Prophet()
+            model.fit(df[["ds", "y"]])
+            future = model.make_future_dataframe(periods=forecast_horizon)
+            forecast = model.predict(future)
+
+            # Personalized Recommendations
+            if indicator == "inflation":
+                loss = (forecast["yhat"].iloc[-1] / 100) * savings
+                st.markdown(f"- 💰 **Projected Loss in Purchasing Power Next Year:** ${loss:.2f}")
+                st.markdown("- 📈 **Recommendation:** Consider investing in inflation-protected assets like TIPS or real estate.")
+                st.markdown("- 🛒 **Budgeting Tip:** Adjust your spending to prioritize essentials and reduce discretionary expenses.")
+            elif indicator == "unemployment":
+                st.markdown("- 🛠️ **Recommendation:** Update your skills or certifications to remain competitive in the job market.")
+                st.markdown("- 🤝 **Consider:** Networking to explore new opportunities and industries showing growth.")
+                st.markdown("- 📊 **Emergency Planning:** Build an emergency fund equal to 6 months of expenses.")
+            elif indicator == "wage_growth":
+                projected_increase = (forecast["yhat"].iloc[-1] / 100) * yearly_income
+                st.markdown(f"- 💵 **Benefit:** Rising wages could add approximately ${projected_increase:.2f} to your annual income.")
+                st.markdown("- 📊 **Recommendation:** Use this additional income to boost your savings or investments.")
+                st.markdown("- 🏠 **Consider:** Allocating funds for long-term goals, such as home ownership or education.")
+
+            # Dynamic Visualization: Expense Breakdown
+            st.markdown("### Expense Breakdown Based on Current Trends")
+            fig = px.pie(values=[monthly_expenses * 12, disposable_income], 
+                        names=["Expenses", "Disposable Income"], 
+                        title="Your Financial Overview")
+            st.plotly_chart(fig)
+
+            # Real-Time News Integration
+            st.markdown("### Recent News Related to Your Financial Goals")
+
+            @st.cache
+            def fetch_news(query):
+                # Example: Use your News API key here
+                api_key = "c4cda9e665ab468c8fbbc59df598fca3"
+                url = f"https://newsapi.org/v2/everything?q={query}&apiKey={api_key}"
+                response = requests.get(url)
+                articles = response.json()["articles"][:3]
+                return articles
+
+            news_articles = fetch_news(indicator)
+            for article in news_articles:
+                st.markdown(f"- [{article['title']}]({article['url']})")
+
+            # Explain Algorithms and Models
+            with st.expander("How Does This Work?"):
+                st.markdown("""
+                - We use **Prophet**, a robust forecasting model developed by Facebook.
+                - The model predicts future trends based on historical data for inflation, unemployment, or wage growth.
+                - Recommendations are generated using these forecasts and aligned with your financial inputs.
+                """)
+
 
 # Simulations Tab
 with tabs[3]:
@@ -190,8 +309,55 @@ with tabs[3]:
 
 # Live Sentiment Tab
 with tabs[4]:
-    avg_sentiment = analyze_sentiment()
+    sentiments, avg_sentiment, articles = analyze_sentiment()
     st.metric("Overall Sentiment Score", avg_sentiment)
+
+    # Sentiment Distribution Pie Chart
+    sentiment_distribution = {
+        "Positive": sum(1 for s in sentiments if s > 0),
+        "Neutral": sum(1 for s in sentiments if s == 0),
+        "Negative": sum(1 for s in sentiments if s < 0),
+    }
+    fig_pie = px.pie(
+        values=list(sentiment_distribution.values()),
+        names=list(sentiment_distribution.keys()),
+        title="Sentiment Distribution of Latest Articles",
+    )
+    st.plotly_chart(fig_pie)
+
+    # Top Keywords
+    stop_words = set(stopwords.words("english"))
+    keywords = [
+        word.lower()
+        for article in articles[:5]
+        for word in article["title"].split()
+        if word.lower() not in stop_words and word.isalpha()
+    ]
+    most_common_keywords = Counter(keywords).most_common(10)
+    keywords_str = ", ".join([word for word, freq in most_common_keywords])
+    st.markdown(f"**Top Keywords from Articles:** {keywords_str}")
+
+    # Word Cloud
+    if keywords:
+        wordcloud = WordCloud(width=800, height=400, background_color="white").generate(
+            " ".join(keywords)
+        )
+        fig, ax = plt.subplots()
+        ax.imshow(wordcloud, interpolation="bilinear")
+        ax.axis("off")
+        st.pyplot(fig)
+
+    # Top Articles with Links
+    st.subheader("Top Articles")
+    for article in articles[:5]:
+        st.markdown(f"- [{article['title']}]({article['url']})")
+
+    # Sentiment Timeline
+    if sentiments:
+        dates = pd.date_range(end=pd.Timestamp.now(), periods=len(sentiments))
+        timeline_df = pd.DataFrame({"Date": dates, "Sentiment": sentiments})
+        fig_timeline = px.line(timeline_df, x="Date", y="Sentiment", title="Sentiment Over Time")
+        st.plotly_chart(fig_timeline)
 
 # Generate Report Tab
 with tabs[5]:
