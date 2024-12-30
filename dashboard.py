@@ -1,5 +1,4 @@
 import os
-import sqlite3
 import pandas as pd
 import numpy as np
 import plotly.express as px
@@ -9,163 +8,195 @@ from prophet import Prophet
 from textblob import TextBlob
 from reportlab.pdfgen import canvas
 import requests
+import matplotlib.pyplot as plt
 
-# Functions to dynamically create and handle the database
-def fetch_data():
-    years = list(range(2000, 2023))  # Dummy data for 23 years
-    gdp_growth = [-1, 2, 3] * (len(years) // 3) + [-1] * (len(years) % 3)
-    inflation = [3, 4, 5] * (len(years) // 3) + [3] * (len(years) % 3)
-    unemployment = [5, 6, 7] * (len(years) // 3) + [5] * (len(years) % 3)
+# Suppress sklearn FutureWarnings
+import warnings
+warnings.filterwarnings("ignore", category=FutureWarning, module="sklearn")
 
+# Fetch Data Function
+def fetch_data(live_data=False):
+    current_year = pd.Timestamp.now().year
+    if live_data:
+        try:
+            api_url = "https://api.worldbank.org/v2/country/USA/indicator/NY.GDP.MKTP.CD?format=json"
+            response = requests.get(api_url)
+            response.raise_for_status()
+            data = response.json()
+            if len(data) > 1 and "value" in data[1][0]:
+                df = pd.DataFrame(data[1])
+                df = df[["date", "value"]].rename(columns={"date": "year", "value": "gdp_growth"})
+                df["year"] = df["year"].astype(int)
+                df["inflation"] = np.random.uniform(1, 3, len(df))  # Placeholder for inflation
+                df["unemployment"] = np.random.uniform(3, 7, len(df))  # Placeholder for unemployment
+                return df[df["year"] >= current_year - 10]
+            else:
+                st.warning("Live data unavailable. Using static fallback.")
+        except Exception as e:
+            st.error(f"Error fetching live data: {e}")
+
+    # Fallback data for the last 10 years
+    years = list(range(current_year - 10, current_year + 1))
+    gdp_growth = np.random.uniform(1, 5, len(years))
+    inflation = np.random.uniform(2, 4, len(years))
+    unemployment = np.random.uniform(3, 8, len(years))
     data = {
         "year": years,
-        "gdp_growth": gdp_growth[:len(years)],
-        "inflation": inflation[:len(years)],
-        "unemployment": unemployment[:len(years)],
+        "gdp_growth": gdp_growth,
+        "inflation": inflation,
+        "unemployment": unemployment,
     }
     return pd.DataFrame(data)
 
+# Process Data Function
 def process_data(df):
     df["rolling_avg_gdp"] = df["gdp_growth"].rolling(window=3).mean()
     features = df[["gdp_growth", "inflation", "unemployment"]].dropna()
-    kmeans = KMeans(n_clusters=3, random_state=42)
+    kmeans = KMeans(n_clusters=3, random_state=42, n_init=10)
     df["economic_phase"] = kmeans.fit_predict(features)
     df["economic_phase_name"] = df["economic_phase"].map({0: "Recession", 1: "Growth", 2: "Stagflation"})
     return df
 
-def save_to_db(df):
-    conn = sqlite3.connect("economic_data.db")
-    df.to_sql("economic_data", conn, if_exists="replace", index=False)
-    conn.close()
-
-def ensure_database():
-    db_path = "economic_data.db"
-    if not os.path.exists(db_path):
-        raw_data = fetch_data()
-        processed_data = process_data(raw_data)
-        save_to_db(processed_data)
-
-@st.cache_data
-def load_data():
-    ensure_database()
-    conn = sqlite3.connect("economic_data.db")
-    data = pd.read_sql("SELECT * FROM economic_data", conn)
-    conn.close()
-    return data
-
+# Generate PDF Report
 def generate_pdf(data):
+    current_year = pd.Timestamp.now().year
+    latest_data = data[data["year"] == current_year]
+
     c = canvas.Canvas("economic_report.pdf")
     c.drawString(100, 750, "US Economic Insights Report")
-    avg_gdp = data['gdp_growth'].mean()
-    avg_inflation = data['inflation'].mean()
-    avg_unemployment = data['unemployment'].mean()
-    c.drawString(100, 730, f"Average GDP Growth: {avg_gdp:.2f}%")
-    c.drawString(100, 710, f"Average Inflation Rate: {avg_inflation:.2f}%")
-    c.drawString(100, 690, f"Average Unemployment Rate: {avg_unemployment:.2f}%")
+    c.drawString(100, 730, f"Last Updated: {pd.Timestamp.now().strftime('%Y-%m-%d')}")
+
+    if not latest_data.empty:
+        gdp = latest_data["gdp_growth"].values[0]
+        inflation = latest_data["inflation"].values[0]
+        unemployment = latest_data["unemployment"].values[0]
+        c.drawString(100, 710, f"Current Year ({current_year}):")
+        c.drawString(100, 690, f"- GDP Growth: {gdp:.2f}%")
+        c.drawString(100, 670, f"- Inflation: {inflation:.2f}%")
+        c.drawString(100, 650, f"- Unemployment: {unemployment:.2f}%")
+    else:
+        c.drawString(100, 710, f"No Data Available for {current_year}.")
+
+    c.drawString(100, 630, "Key Insights:")
+    c.drawString(100, 610, "- During high inflation, secure assets perform well.")
+    c.drawString(100, 590, "- Growth phases are ideal for investments.")
+
+    fig, ax = plt.subplots()
+    data.plot(x="year", y=["gdp_growth", "inflation", "unemployment"], ax=ax)
+    ax.set_title("Economic Trends Over Time")
+    plt.savefig("trends.png")
+    c.drawImage("trends.png", 100, 400, width=400, height=200)
+
     c.save()
 
-st.title("US Economic Insights Dashboard")
-data = load_data()
+# Live Sentiment Analysis Function
+def analyze_sentiment():
+    api_key = "c4cda9e665ab468c8fbbc59df598fca3"
+    url = f"https://newsapi.org/v2/everything?q=economy&language=en&apiKey={api_key}"
 
-tab1, tab2, tab3, tab4, tab5 = st.tabs([
-    "Visualizations", "Forecasting", "Simulations", "News Sentiment", "Generate Report"
-])
+    try:
+        response = requests.get(url)
+        response.raise_for_status()
+        articles = response.json().get("articles", [])
+        sentiments = []
+        for article in articles[:5]:
+            title = article.get("title", "No title available")
+            sentiment_score = TextBlob(title).sentiment.polarity
+            sentiments.append(sentiment_score)
+        avg_sentiment = np.mean(sentiments)
+        return avg_sentiment
+    except Exception as e:
+        st.error(f"Error fetching sentiment: {e}")
+        return 0  # Neutral fallback sentiment
 
-with tab1:
-    st.subheader("Economic Trends")
+# Main Dashboard Implementation
+live_data = st.sidebar.checkbox("Use Live Data", value=False)
+data = fetch_data(live_data=live_data)
+data = process_data(data)
+
+tabs = st.tabs(["Overview", "Visualizations", "Forecasting", "Simulations", "Live Sentiment", "Generate Report"])
+
+# Overview Tab
+with tabs[0]:
+    st.image("banner.jpg", use_container_width=True)
+    st.markdown("""
+    ### Welcome to the US Economic Insights Dashboard
+    This dashboard provides:
+    - **Economic Trends**: Visualize key metrics like GDP, inflation, and unemployment.
+    - **Forecasting Tools**: Predict economic indicators to guide decision-making.
+    - **Monte Carlo Simulations**: Assess investment risks and returns.
+    - **Live Sentiment Analysis**: Stay updated on market sentiment.
+    """)
+
+    st.markdown("### Economic Insights Clock")
+    st.write("Live updates on key economic metrics and insights:")
+
+    # Calculate Economic Health Score
+    current_data = data.iloc[-1]
+    gdp_growth = current_data["gdp_growth"]
+    inflation = current_data["inflation"]
+    unemployment = current_data["unemployment"]
+    avg_sentiment = analyze_sentiment()
+
+    gdp_score = np.clip((gdp_growth - 1) / (5 - 1) * 100, 0, 100)
+    inflation_score = np.clip((4 - inflation) / (4 - 2) * 100, 0, 100)
+    unemployment_score = np.clip((8 - unemployment) / (8 - 3) * 100, 0, 100)
+    sentiment_score = np.clip((avg_sentiment + 1) / 2 * 100, 0, 100)
+
+    economic_health_score = round(
+        0.4 * gdp_score + 0.3 * inflation_score + 0.2 * unemployment_score + 0.1 * sentiment_score, 2
+    )
+
+    st.metric("GDP Growth", f"{gdp_growth:.2f}%")
+    st.metric("Inflation", f"{inflation:.2f}%")
+    st.metric("Unemployment", f"{unemployment:.2f}%")
+    st.metric("Economic Health Score", f"{economic_health_score}/100")
+
+# Visualization Tab
+with tabs[1]:
+    st.subheader("Economic Trends Over Time")
     fig = px.line(data, x="year", y=["gdp_growth", "inflation", "unemployment"],
                   labels={"value": "Percentage", "variable": "Indicator"},
                   title="Economic Indicators Over Time")
     st.plotly_chart(fig)
 
-    st.subheader("Clustered Economic Phases")
-    if "economic_phase_name" in data.columns:
-        fig2 = px.scatter(data, x="gdp_growth", y="unemployment",
-                          color="economic_phase_name", title="Economic Phases")
-        st.plotly_chart(fig2)
-
-with tab2:
+# Forecasting Tab
+with tabs[2]:
     st.subheader("Forecasting")
     indicator = st.selectbox("Select Indicator", ["gdp_growth", "inflation", "unemployment"])
+    forecast_horizon = st.slider("Forecast Horizon (Years)", 1, 20, 10)
     if st.button("Run Forecast"):
-        try:
-            df = data.rename(columns={"year": "ds", indicator: "y"})
-            model = Prophet()
-            model.fit(df[["ds", "y"]])
-            future = model.make_future_dataframe(periods=10)
-            forecast = model.predict(future)
-            fig3 = px.line(forecast, x="ds", y=["yhat", "yhat_lower", "yhat_upper"],
-                           labels={"ds": "Year", "value": "Forecast"},
-                           title=f"Forecast for {indicator}")
-            st.plotly_chart(fig3)
-        except Exception as e:
-            st.error(f"Forecasting failed: {e}")
+        df = data.rename(columns={"year": "ds", indicator: "y"})
+        model = Prophet()
+        model.fit(df[["ds", "y"]])
+        future = model.make_future_dataframe(periods=forecast_horizon)
+        forecast = model.predict(future)
+        fig = px.line(forecast, x="ds", y=["yhat", "yhat_lower", "yhat_upper"],
+                      labels={"ds": "Year", "value": "Forecast"},
+                      title=f"Forecast for {indicator.capitalize()}")
+        st.plotly_chart(fig)
 
-with tab3:
+# Simulations Tab
+with tabs[3]:
     st.subheader("Monte Carlo Simulation")
     initial_investment = st.number_input("Initial Investment ($)", value=1000.0)
-    growth_rate = st.slider("Expected Annual Growth Rate (%)", 0.0, 20.0, 5.0)
-    years = st.slider("Number of Years", 1, 50, 10)
-    simulations = st.number_input("Number of Simulations", value=1000, step=100)
-
+    growth_rate = st.slider("Annual Growth Rate (%)", 0.0, 20.0, 5.0)
+    years = st.slider("Investment Period (Years)", 1, 30, 10)
     if st.button("Run Simulation"):
-        results = []
-        for _ in range(simulations):
-            yearly_growth = np.random.normal(growth_rate / 100, 0.02, years)
-            portfolio_value = initial_investment * np.cumprod(1 + yearly_growth)
-            results.append(portfolio_value[-1])
+        results = [initial_investment * np.prod(1 + np.random.normal(growth_rate / 100, 0.02, years))
+                   for _ in range(1000)]
+        fig = px.histogram(results, nbins=50, title="Monte Carlo Simulation Results")
+        st.plotly_chart(fig)
 
-        st.write(f"Median Portfolio Value: ${np.median(results):,.2f}")
-        fig4 = px.histogram(results, nbins=50, title="Monte Carlo Simulation Results")
-        fig4.update_layout(xaxis_title="Portfolio Value ($)", yaxis_title="Frequency")
-        st.plotly_chart(fig4)
+# Live Sentiment Tab
+with tabs[4]:
+    avg_sentiment = analyze_sentiment()
+    st.metric("Overall Sentiment Score", avg_sentiment)
 
-with tab4:
-    st.subheader("Live News Sentiment Analysis")
-
-    # Description of the feature
-    st.write("""
-        This feature retrieves the latest news articles about the economy and analyzes the sentiment 
-        of their headlines. Positive, negative, or neutral sentiments provide insights into the current 
-        perception of economic events in the media.
-    """)
-
-    # Using your NewsAPI key
-    api_key = "c4cda9e665ab468c8fbbc59df598fca3"
-    url = f"https://newsapi.org/v2/everything?q=economy&language=en&sortBy=publishedAt&apiKey={api_key}"
-
-    try:
-        # Fetching the news articles
-        response = requests.get(url)
-        response.raise_for_status()  # Raise an error for HTTP issues
-        articles = response.json().get("articles", [])
-
-        if articles:
-            for article in articles[:5]:  # Display the top 5 articles
-                title = article.get("title", "No title available")
-                description = article.get("description", "No description available")
-                url = article.get("url", "")
-
-                # Analyze sentiment of the article's title
-                sentiment_score = TextBlob(title).sentiment.polarity
-                sentiment_label = "Positive" if sentiment_score > 0 else "Negative" if sentiment_score < 0 else "Neutral"
-
-                # Display the article with its sentiment
-                st.write(f"**[{title}]({url})** ({sentiment_label})")
-                st.write(f"*{description}*")
-                st.write("---")  # Divider
-        else:
-            st.write("No news articles found for the query.")
-    except requests.exceptions.RequestException as e:
-        st.error(f"Failed to fetch news: {e}")
-
-
-with tab5:
-    st.subheader("Generate Economic Report")
+# Generate Report Tab
+with tabs[5]:
+    st.subheader("Generate Report")
     if st.button("Download Report"):
-        try:
-            generate_pdf(data)
-            with open("economic_report.pdf", "rb") as pdf:
-                st.download_button("Download Report", pdf, file_name="economic_report.pdf")
-        except Exception as e:
-            st.error(f"PDF generation failed: {e}")
+        generate_pdf(data)
+        with open("economic_report.pdf", "rb") as pdf:
+            st.download_button("Download Report", pdf, file_name="economic_report.pdf")

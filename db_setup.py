@@ -9,7 +9,8 @@ def setup_database():
         gdp_growth REAL,
         inflation REAL,
         unemployment REAL,
-        economic_phase TEXT
+        economic_phase TEXT,
+        data_source TEXT DEFAULT 'static' -- To differentiate between live and static data
     )
     ''')
     conn.close()

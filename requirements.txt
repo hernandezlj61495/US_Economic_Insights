@@ -2,8 +2,9 @@ streamlit
 pandas
 numpy
 plotly
+scikit-learn
 prophet
 textblob
 requests
+matplotlib
 reportlab
-scikit-learn
