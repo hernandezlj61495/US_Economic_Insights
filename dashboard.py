@@ -194,9 +194,6 @@ with tabs[1]:
 # Rewriting the Forecast Tab with a Focus on Comprehensive Financial Forecasting
 
 # Forecasting Tab
-# Rewriting the Forecast Tab with a Focus on Comprehensive Financial Forecasting
-
-# Forecasting Tab
 with tabs[2]:
     st.subheader("Forecasting: Comprehensive Financial Insights for Your Future")
 
