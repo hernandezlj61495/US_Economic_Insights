@@ -319,16 +319,95 @@ with tabs[2]:
             """)
 
 # Simulations Tab
+# Enhancing the Simulations Tab with Education and Interactive Simulations
+
+# Simulations Tab
+# Enhancing the Simulations Tab with Advanced Interactive Simulations
+
+# Simulations Tab
 with tabs[3]:
-    st.subheader("Monte Carlo Simulation")
-    initial_investment = st.number_input("Initial Investment ($)", value=1000.0)
-    growth_rate = st.slider("Annual Growth Rate (%)", 0.0, 20.0, 5.0)
-    years = st.slider("Investment Period (Years)", 1, 30, 10)
-    if st.button("Run Simulation"):
-        results = [initial_investment * np.prod(1 + np.random.normal(growth_rate / 100, 0.02, years))
-                   for _ in range(1000)]
-        fig = px.histogram(results, nbins=50, title="Monte Carlo Simulation Results")
+    st.subheader("Simulations: Explore Your Financial Future")
+
+    # Educational Section
+    st.markdown("""
+    ### Understanding Simulations:
+    - **Monte Carlo Simulation**: This simulates potential investment outcomes by running thousands of scenarios with random variables.
+    - **Portfolio Diversification**: Learn how spreading your investments across stocks, bonds, and real estate reduces risk and stabilizes returns.
+    - **Inflation Impact**: Understand how inflation affects purchasing power and adjusts the real returns of your investments.
+    - **Savings Growth**: Explore how consistent monthly savings and compounding interest can grow your wealth.
+    - **Goal-Based Simulations**: See how long it will take to achieve financial goals like buying a house or retiring.
+    """)
+
+    # Interactive Explanation of Diversification
+    st.markdown("### What is Portfolio Diversification?")
+    st.markdown("""
+    Diversification means spreading your investments across different asset classes like stocks, bonds, and real estate to reduce risk.
+    - **Why Diversify?**
+      - Reduces the chance of losing money if one asset class performs poorly.
+      - Helps achieve a balance between risk and reward.
+    - **Example Portfolio:**
+      - 50% Stocks, 30% Bonds, 20% Real Estate
+    """)
+
+    fig = px.pie(values=[50, 30, 20], names=["Stocks", "Bonds", "Real Estate"], title="Example Portfolio Diversification")
+    st.plotly_chart(fig)
+
+    # Monte Carlo Simulation
+    st.markdown("### Monte Carlo Simulation")
+    initial_investment = st.number_input("Initial Investment ($):", value=1000.0, step=100.0)
+    annual_growth_rate = st.slider("Annual Growth Rate (%):", 0.0, 20.0, 5.0)
+    investment_period = st.slider("Investment Period (Years):", 1, 30, 10)
+
+    if st.button("Run Monte Carlo Simulation"):
+        import numpy as np
+        simulations = []
+        for _ in range(1000):
+            returns = np.random.normal(annual_growth_rate / 100, 0.05, investment_period)
+            total_growth = initial_investment * np.prod(1 + returns)
+            simulations.append(total_growth)
+
+        fig = px.histogram(simulations, nbins=50, title="Monte Carlo Simulation Results", labels={"value": "Portfolio Value ($)"})
         st.plotly_chart(fig)
+
+    # Inflation-Adjusted Returns
+    st.markdown("### Inflation-Adjusted Returns")
+    inflation_rate = st.slider("Inflation Rate (%):", 0.0, 10.0, 2.0)
+    real_returns = annual_growth_rate - inflation_rate
+    st.markdown(f"- 📉 **Real Annual Growth Rate:** {real_returns:.2f}%")
+    st.markdown("- **Tip:** Focus on investments that outpace inflation to maintain purchasing power.")
+
+    # Goal-Based Simulation
+    st.markdown("### Goal-Based Simulation")
+    goal_amount = st.number_input("Enter Your Financial Goal Amount ($):", value=100000)
+    years_to_goal = goal_amount / (initial_investment * ((1 + annual_growth_rate / 100) ** investment_period))
+    st.markdown(f"- 🎯 **Time to Achieve Your Goal:** {years_to_goal:.1f} years")
+    st.markdown("- 📘 **Action:** Consider increasing your annual growth rate or contributions to achieve your goal faster.")
+
+    # Debt Payoff Simulation
+    st.markdown("### Debt Payoff Simulation")
+    loan_balance = st.number_input("Enter Your Loan Balance ($):", value=20000)
+    interest_rate = st.number_input("Enter Your Loan Interest Rate (%):", value=5.0)
+    monthly_payment = st.number_input("Enter Your Monthly Payment ($):", value=500.0)
+
+    if monthly_payment > (loan_balance * (interest_rate / 100 / 12)):
+        payoff_time = loan_balance / (monthly_payment - (loan_balance * (interest_rate / 100 / 12)))
+        st.markdown(f"- 💳 **Estimated Payoff Time:** {payoff_time:.1f} months")
+        st.markdown("- ✅ **Tip:** Increase your monthly payment to reduce interest costs.")
+    else:
+        st.markdown("- ⚠️ **Warning:** Your monthly payment is too low to cover the interest. Consider increasing it.")
+
+    # Scenario-Based Simulations
+    st.markdown("### Scenario-Based Simulations")
+    scenario = st.radio("Choose a Scenario", ["Optimistic", "Moderate", "Pessimistic"])
+    adjustment_factor = {"Optimistic": 1.1, "Moderate": 1.0, "Pessimistic": 0.9}[scenario]
+    adjusted_growth_rate = annual_growth_rate * adjustment_factor
+    st.markdown(f"- 📊 **Adjusted Annual Growth Rate ({scenario}):** {adjusted_growth_rate:.2f}%")
+
+    # Dynamic Visualization
+    future_values = [initial_investment * ((1 + adjusted_growth_rate / 100) ** year) for year in range(1, investment_period + 1)]
+    fig = px.line(x=range(1, investment_period + 1), y=future_values, title=f"{scenario} Scenario Growth Over Time", labels={"x": "Year", "y": "Portfolio Value ($)"})
+    st.plotly_chart(fig)
+
 
 # Live Sentiment Tab
 with tabs[4]:
