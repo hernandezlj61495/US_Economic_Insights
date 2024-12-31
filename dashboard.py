@@ -182,18 +182,96 @@ with tabs[0]:
     st.metric("Economic Health Score", f"{economic_health_score}/100")
 
 # Visualization Tab
+# Visualizations Tab with Interactive US Map for GDP, Inflation, and Unemployment
+
+# Visualizations Tab
+# Visualizations Tab with Interactive US Map for GDP, Inflation, and Unemployment
+
+# Visualizations Tab
 with tabs[1]:
-    st.subheader("Economic Trends Over Time")
-    fig = px.line(data, x="year", y=["gdp_growth", "inflation", "unemployment"],
-                  labels={"value": "Percentage", "variable": "Indicator"},
-                  title="Economic Indicators Over Time")
+    st.subheader("Visualizations: Explore Economic Trends")
+
+    # Display Current Date and Time
+    import datetime
+    current_datetime = datetime.datetime.now().strftime("%B %d, %Y at %I:%M %p")
+    st.markdown(f"### As of Today: {current_datetime}")
+
+    # Educational Content
+    st.markdown("""
+    ### Explore Key Economic Indicators:
+    - **GDP**: The total value of goods and services produced in the United States.
+    - **Unemployment**: The percentage of people in the labor force without jobs.
+    - **Inflation**: The rate at which the general level of prices for goods and services is rising.
+    - **Industry Performance**: Discover the top-performing industries for each state.
+    """)
+
+    # Fetch and Process Live Data
+    @st.cache_data
+    def fetch_us_economic_data():
+        # Replace with real API URLs or data processing
+        import pandas as pd
+
+        # Placeholder for actual API data fetching
+        data = {
+            "State": ["California", "Texas", "Florida", "New York"],
+            "GDP": [3.9, 2.1, 1.5, 1.8],  # Trillions
+            "Unemployment": [4.0, 3.2, 2.8, 3.9],  # Percentage
+            "Inflation": [2.5, 2.4, 2.3, 2.6],  # Percentage
+            "Top Industry": ["Technology", "Energy", "Tourism", "Finance"],
+            "Economic Summary": [
+                "California has a strong technology sector led by Silicon Valley.",
+                "Texas benefits from a booming energy sector including oil and gas.",
+                "Florida thrives on tourism, with key attractions like Disney World.",
+                "New York is driven by its financial services and Wall Street dominance."
+            ],
+            "State Code": ["CA", "TX", "FL", "NY"]
+        }
+
+        df = pd.DataFrame(data)
+        return df
+
+    economic_data = fetch_us_economic_data()
+
+    # Select Indicator to Visualize
+    indicator = st.selectbox("Select Indicator to Visualize", ["GDP", "Unemployment", "Inflation"])
+
+    # Create Interactive Map
+    import plotly.express as px
+
+    fig = px.choropleth(
+        economic_data,
+        locations="State Code",
+        locationmode="USA-states",
+        color=indicator,
+        hover_name="State",
+        title=f"US {indicator} by State",
+        color_continuous_scale="Viridis",
+        scope="usa"
+    )
+
     st.plotly_chart(fig)
 
+    # Interactive State-Specific Insights
+    st.markdown("### State-Specific Insights")
+    selected_state = st.selectbox("Select a State to View Details", economic_data["State"].unique())
 
-# Forecasting Tab
-# Rewriting the Forecast Tab with a Focus on Comprehensive Financial Forecasting
+    state_details = economic_data[economic_data["State"] == selected_state].iloc[0]
+    st.markdown(f"**State:** {state_details['State']}")
+    st.markdown(f"**Top Industry:** {state_details['Top Industry']}")
+    st.markdown(f"**GDP:** ${state_details['GDP']} Trillion")
+    st.markdown(f"**Unemployment Rate:** {state_details['Unemployment']}%")
+    st.markdown(f"**Inflation Rate:** {state_details['Inflation']}%")
+    st.markdown(f"**Economic Summary:** {state_details['Economic Summary']}")
 
-# Forecasting Tab
+    # Add General Insights Below the Map
+    st.markdown("""
+    ### General Insights:
+    - **GDP**: States with higher GDP often have large industries or populations, like California and Texas.
+    - **Unemployment**: Lower unemployment indicates a strong labor market, but may vary by region.
+    - **Inflation**: Inflation rates can vary slightly by state but generally follow national trends.
+    """)
+
+#Forecast Tab
 with tabs[2]:
     st.subheader("Forecasting: Comprehensive Financial Insights for Your Future")
 
