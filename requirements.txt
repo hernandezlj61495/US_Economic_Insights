@@ -8,3 +8,4 @@ requests
 textblob
 matplotlib
 wordcloud
+reportlab
