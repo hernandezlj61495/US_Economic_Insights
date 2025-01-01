@@ -14,14 +14,6 @@ from nltk.corpus import stopwords
 from wordcloud import WordCloud
 import nltk
 import datetime
-from dotenv import load_dotenv  # For environment variables
-
-# =============================
-# 2. Initial Setup and Configuration
-# =============================
-
-# Load environment variables from .env file
-load_dotenv()
 
 # Download NLTK stopwords if not already present
 nltk.download("stopwords")
@@ -37,65 +29,35 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
-# =============================
-# 3. Custom CSS for Styling
-# =============================
-
-def load_css():
-    """
-    Load custom CSS styles for the dashboard.
-    """
-    try:
-        with open("styles.css") as f:
-            st.markdown(f'<style>{f.read()}</style>', unsafe_allow_html=True)
-    except FileNotFoundError:
-        st.warning("CSS file 'styles.css' not found. Proceeding without custom styles.")
-
-# Apply custom CSS if available
-load_css()
-
-# Alternatively, inject CSS directly
-st.markdown(
-    """
+# Custom CSS for styling
+# Commented out to ensure it doesn't hide any elements. Uncomment if styling is needed.
+st.markdown("""
     <style>
-    /* Custom CSS */
-    .big-font {
-        font-size:20px !important;
-    }
-    .metric-title {
-        font-size: 18px;
-        color: #4CAF50;
-    }
-    /* Footer Styling */
-    .footer {
-        position: fixed;
-        left: 0;
-        bottom: 0;
-        width: 100%;
-        background-color: #f1f1f1;
-        color: #333;
-        text-align: center;
-        padding: 10px;
-    }
+        .main {
+            background-color: #f0f4fc; /* Light blue for main background */
+            color: #222222; /* Darker text color for contrast */
+        }
+        h1, h2, h3, h4, h5 {
+            color: #00509e; /* Navy blue for headings */
+        }
+        .stButton>button {
+            background-color: #00509e; /* Navy blue buttons */
+            color: white;
+            border-radius: 10px;
+            padding: 10px;
+        }
+        .css-1d391kg {
+            background-color: #f7faff; /* Very light blue for sidebar */
+        }
     </style>
-    """,
-    unsafe_allow_html=True
-)
-
-# =============================
-# 4. API Key and Environment Variables
-# =============================
+""", unsafe_allow_html=True)
 
 # Set API Key for Sentiment Analysis
-NEWSAPI_KEY = os.getenv("NEWSAPI_KEY")
-if not NEWSAPI_KEY:
-    st.error("API Key for NewsAPI not found. Please set the NEWSAPI_KEY environment variable.")
-    st.stop()
+# It's recommended to set your API key as an environment variable for security
+# Example: export NEWSAPI_KEY="your_api_key_here"
+NEWSAPI_KEY = os.getenv("NEWSAPI_KEY", "c4cda9e665ab468c8fbbc59df598fca3")  # Replace with your actual API key
 
-# =============================
-# 5. Data Loading with Caching
-# =============================
-
+# Fetch Data Function
 @st.cache_data(show_spinner=False)
 def fetch_data(live_data=False):
     current_year = pd.Timestamp.now().year
@@ -107,7 +69,7 @@ def fetch_data(live_data=False):
             data = response.json()
             if len(data) > 1 and "value" in data[1][0]:
                 df = pd.DataFrame(data[1])
-                df = df[["date", "value"]].rename(columns={"date": "year", "value": "gdp"})
+                df = df[["date", "value"]].rename(columns={"date": "year", "value": "gdp_growth"})
                 df["year"] = df["year"].astype(int)
                 df["inflation"] = np.random.uniform(1, 3, len(df))  # Placeholder for inflation
                 df["unemployment"] = np.random.uniform(3, 7, len(df))  # Placeholder for unemployment
@@ -119,58 +81,31 @@ def fetch_data(live_data=False):
     
     # Fallback data for the last 10 years
     years = list(range(current_year - 10, current_year + 1))
-    gdp = np.random.uniform(1, 5, len(years))
+    gdp_growth = np.random.uniform(1, 5, len(years))
     inflation = np.random.uniform(2, 4, len(years))
     unemployment = np.random.uniform(3, 8, len(years))
     data = {
         "year": years,
-        "gdp_growth": gdp,
+        "gdp_growth": gdp_growth,
         "inflation": inflation,
         "unemployment": unemployment,
     }
     return pd.DataFrame(data)
 
-@st.cache_data(show_spinner=False)
-def fetch_us_economic_data():
-    # Replace with real API URLs or data processing as needed
-    data = {
-        "State": ["California", "Texas", "Florida", "New York"],
-        "GDP": [3.9, 2.1, 1.5, 1.8],  # Trillions
-        "Unemployment": [4.0, 3.2, 2.8, 3.9],  # Percentage
-        "Inflation": [2.5, 2.4, 2.3, 2.6],  # Percentage
-        "Top Industry": ["Technology", "Energy", "Tourism", "Finance"],
-        "Economic Summary": [
-            "California has a strong technology sector led by Silicon Valley.",
-            "Texas benefits from a booming energy sector including oil and gas.",
-            "Florida thrives on tourism, with key attractions like Disney World.",
-            "New York is driven by its financial services and Wall Street dominance."
-        ],
-        "State Code": ["CA", "TX", "FL", "NY"]
-    }
-    df = pd.DataFrame(data)
-    return df
-
-# =============================
-# 6. Data Processing
-# =============================
-
+# Process Data Function
 def process_data(df):
     df["rolling_avg_gdp"] = df["gdp_growth"].rolling(window=3).mean()
     features = df[["gdp_growth", "inflation", "unemployment"]].dropna()
     if not features.empty:
         kmeans = KMeans(n_clusters=3, random_state=42, n_init=10)
         df["economic_phase"] = kmeans.fit_predict(features)
-        phase_mapping = {0: "Recession", 1: "Growth", 2: "Stagflation"}
-        df["economic_phase_name"] = df["economic_phase"].map(phase_mapping)
+        df["economic_phase_name"] = df["economic_phase"].map({0: "Recession", 1: "Growth", 2: "Stagflation"})
     else:
         df["economic_phase"] = np.nan
         df["economic_phase_name"] = "Unknown"
     return df
 
-# =============================
-# 7. PDF Report Generation
-# =============================
-
+# Generate PDF Report
 def generate_pdf(data):
     current_year = pd.Timestamp.now().year
     latest_data = data[data["year"] == current_year]
@@ -198,26 +133,25 @@ def generate_pdf(data):
 
     # Generate Economic Trends Plot
     fig, ax = plt.subplots(figsize=(6, 4))
-    if {'gdp_growth', 'inflation', 'unemployment'}.issubset(data.columns):
-        data.plot(x="year", y=["gdp_growth", "inflation", "unemployment"], ax=ax)
-        ax.set_title("Economic Trends Over Time")
-        plt.tight_layout()
-        plt.savefig("trends.png")
-        plt.close(fig)
-        c.drawImage("trends.png", 100, 400, width=400, height=200)
-    else:
-        c.drawString(100, 600, "Insufficient data for economic trends chart.")
+    data.plot(x="year", y=["gdp_growth", "inflation", "unemployment"], ax=ax)
+    ax.set_title("Economic Trends Over Time")
+    plt.tight_layout()
+    plt.savefig("trends.png")
+    plt.close(fig)
+
+    c.drawImage("trends.png", 100, 400, width=400, height=200)
 
     c.save()
 
-# =============================
-# 8. Sentiment Analysis
-# =============================
-
+# Live Sentiment Analysis Function
 @st.cache_data(show_spinner=False)
 def analyze_sentiment():
+    if NEWSAPI_KEY == "c4cda9e665ab468c8fbbc59df598fca3":
+        st.warning("Using default API key. Please set your own NEWSAPI_KEY environment variable for better reliability.")
+    
+    url = f"https://newsapi.org/v2/everything?q=economy&language=en&apiKey={NEWSAPI_KEY}"
+
     try:
-        url = f"https://newsapi.org/v2/everything?q=economy&language=en&apiKey={NEWSAPI_KEY}"
         response = requests.get(url)
         response.raise_for_status()
         articles = response.json().get("articles", [])
@@ -236,14 +170,37 @@ def analyze_sentiment():
         st.error(f"Error fetching sentiment: {e}")
         return [], 0, []  # Neutral fallback sentiment
 
-# =============================
-# 9. News Fetching
-# =============================
+# Fetch US Economic Data Function
+@st.cache_data(show_spinner=False)
+def fetch_us_economic_data():
+    # Replace with real API URLs or data processing as needed
+    data = {
+        "State": ["California", "Texas", "Florida", "New York"],
+        "GDP": [3.9, 2.1, 1.5, 1.8],  # Trillions
+        "Unemployment": [4.0, 3.2, 2.8, 3.9],  # Percentage
+        "Inflation": [2.5, 2.4, 2.3, 2.6],  # Percentage
+        "Top Industry": ["Technology", "Energy", "Tourism", "Finance"],
+        "Economic Summary": [
+            "California has a strong technology sector led by Silicon Valley.",
+            "Texas benefits from a booming energy sector including oil and gas.",
+            "Florida thrives on tourism, with key attractions like Disney World.",
+            "New York is driven by its financial services and Wall Street dominance."
+        ],
+        "State Code": ["CA", "TX", "FL", "NY"]
+    }
 
+    df = pd.DataFrame(data)
+    return df
+
+# Function to fetch news articles
 @st.cache_data(show_spinner=False)
 def fetch_news(query):
+    if NEWSAPI_KEY == "c4cda9e665ab468c8fbbc59df598fca3":
+        st.warning("Using default API key. Please set your own NEWSAPI_KEY environment variable for better reliability.")
+
+    url = f"https://newsapi.org/v2/everything?q={query}&language=en&apiKey={NEWSAPI_KEY}"
+
     try:
-        url = f"https://newsapi.org/v2/everything?q={query}&language=en&apiKey={NEWSAPI_KEY}"
         response = requests.get(url)
         response.raise_for_status()
         articles = response.json().get("articles", [])
@@ -252,22 +209,16 @@ def fetch_news(query):
         st.error(f"Error fetching news: {e}")
         return []
 
-# =============================
-# 10. Main Dashboard Implementation
-# =============================
-
+# Main Dashboard Implementation
 def main():
-    # Sidebar Settings
+    # Sidebar Options
     st.sidebar.title("Settings")
     live_data = st.sidebar.checkbox("Use Live Data", value=False)
     show_debug = st.sidebar.checkbox("Show Debug Info", value=False)
 
     # Fetch and Process Data
     data = fetch_data(live_data=live_data)
-    if not data.empty:
-        data = process_data(data)
-    else:
-        st.error("No data available. Please check data sources.")
+    data = process_data(data)
 
     if show_debug:
         st.sidebar.markdown("### Debug Information")
@@ -277,9 +228,7 @@ def main():
     # Create Tabs
     tabs = st.tabs(["Overview", "Visualizations", "Forecasting", "Simulations", "Live Sentiment", "Generate Report"])
 
-    # =============================
-    # 10.1. Overview Tab
-    # =============================
+    # Overview Tab
     with tabs[0]:
         st.header("Overview")
 
@@ -307,16 +256,13 @@ def main():
         if data.empty:
             st.error("No economic data available to display.")
         else:
-            latest_data = data.iloc[-1]
+            current_data = data.iloc[-1]
             if show_debug:
-                st.write("Latest Data:", latest_data)  # Debugging
+                st.write("Current Data:", current_data)  # Debugging
 
-            # Extract Metrics
-            gdp_growth = latest_data.get("gdp_growth", None)
-            inflation = latest_data.get("inflation", None)
-            unemployment = latest_data.get("unemployment", None)
-            economic_phase = latest_data.get("economic_phase_name", "Unknown")
-            rolling_avg_gdp = latest_data.get("rolling_avg_gdp", None)
+            gdp_growth = current_data.get("gdp_growth", None)
+            inflation = current_data.get("inflation", None)
+            unemployment = current_data.get("unemployment", None)
 
             if None in (gdp_growth, inflation, unemployment):
                 st.error("Missing economic indicators in the data.")
@@ -337,44 +283,21 @@ def main():
                 )
 
                 # Display Metrics in Columns
-                col1, col2, col3, col4 = st.columns(4)
+                col1, col2 = st.columns(2)
                 with col1:
                     st.metric("GDP Growth", f"{gdp_growth:.2f}%")
+                    st.metric("Inflation", f"{inflation:.2f}%")
                 with col2:
-                    st.metric("Inflation Rate", f"{inflation:.2f}%")
-                with col3:
-                    st.metric("Unemployment Rate", f"{unemployment:.2f}%")
-                with col4:
+                    st.metric("Unemployment", f"{unemployment:.2f}%")
                     st.metric("Economic Health Score", f"{economic_health_score}/100")
 
-                # Additional Metrics
-                st.markdown("### Rolling Average GDP Growth")
-                if rolling_avg_gdp:
-                    st.metric("Rolling Avg GDP Growth (3-year)", f"{rolling_avg_gdp:.2f}%")
-                else:
-                    st.metric("Rolling Avg GDP Growth (3-year)", "N/A")
-                    st.warning("Rolling average GDP growth not available.")
-
-                st.markdown("### Current Economic Phase")
-                st.write(f"**Economic Phase:** {economic_phase}")
-
-                st.markdown("### Average Sentiment Score")
-                if sentiments:
-                    st.metric("Average Sentiment Score", f"{avg_sentiment:.2f}")
-                else:
-                    st.metric("Average Sentiment Score", "N/A")
-                    st.warning("No sentiment data available.")
-
-    # =============================
-    # 10.2. Visualizations Tab
-    # =============================
+    # Visualizations Tab
     with tabs[1]:
         st.header("Visualizations: Explore Economic Trends")
 
         # Display Current Date and Time
         current_datetime = datetime.datetime.now().strftime("%B %d, %Y at %I:%M %p")
         st.markdown(f"### As of Today: {current_datetime}")
-        st.markdown("---")
 
         # Educational Content
         st.markdown("""
@@ -425,9 +348,7 @@ def main():
         - **Inflation**: Inflation rates can vary slightly by state but generally follow national trends.
         """)
 
-    # =============================
-    # 10.3. Forecasting Tab
-    # =============================
+    # Forecasting Tab
     with tabs[2]:
         st.header("Forecasting: Comprehensive Financial Insights for Your Future")
 
@@ -472,7 +393,7 @@ def main():
         savings = st.number_input("Enter Your Total Savings ($):", min_value=0, value=10000)
 
         disposable_income = yearly_income - (monthly_expenses * 12)
-        st.markdown(f"### Your Disposable Income: ${disposable_income:.2f}")
+        st.markdown(f"### Your Disposable Income: ${disposable_income:,.2f}")
 
         years_to_retirement = retirement_age - current_age
 
@@ -483,14 +404,15 @@ def main():
             st.markdown("### Comprehensive Financial Recommendations")
 
             # Prepare Data for Machine Learning Models
-            if {'year', 'gdp_growth', 'inflation', 'unemployment'}.issubset(data.columns):
-                df = data.rename(columns={"year": "ds", "gdp_growth": "y"})  # Example using gdp_growth for forecast
+            df = data.rename(columns={"year": "ds", "inflation": "y"})  # Example using inflation for forecast
+
+            try:
                 model = Prophet()
                 model.fit(df[["ds", "y"]])
                 future = model.make_future_dataframe(periods=forecast_horizon, freq='Y')
                 forecast = model.predict(future)
-            else:
-                st.error("Insufficient data for forecasting.")
+            except Exception as e:
+                st.error(f"Error in forecasting model: {e}")
                 forecast = pd.DataFrame()
 
             # Retirement Planning
@@ -533,16 +455,8 @@ def main():
             scenario = st.radio("Select Scenario", ["Optimistic", "Moderate", "Pessimistic"])
             adjustment_factor = {"Optimistic": 1.1, "Moderate": 1.0, "Pessimistic": 0.9}[scenario]
             if not forecast.empty:
-                adjusted_forecast = forecast.copy()
-                adjusted_forecast["yhat"] = adjusted_forecast["yhat"] * adjustment_factor
-                fig = px.line(
-                    adjusted_forecast,
-                    x="ds",
-                    y="yhat",
-                    title=f"{scenario} Scenario Forecast",
-                    labels={"ds": "Year", "yhat": "GDP Growth (%)"},
-                    markers=True
-                )
+                adjusted_forecast = forecast["yhat"] * adjustment_factor
+                fig = px.line(forecast, x="ds", y=adjusted_forecast, title=f"{scenario} Scenario")
                 st.plotly_chart(fig, use_container_width=True)
             else:
                 st.warning("Insufficient data for scenario comparisons.")
@@ -551,26 +465,27 @@ def main():
             st.markdown("### Recent News Related to Your Financial Goals")
 
             # Fetch News Articles
-            news_articles = fetch_news("finance")
-            if news_articles:
-                for article in news_articles:
-                    st.markdown(f"- [{article['title']}]({article['url']})")
-            else:
-                st.write("No recent news articles found.")
+            try:
+                news_articles = fetch_news("finance")
+                if news_articles:
+                    for article in news_articles:
+                        st.markdown(f"- [{article['title']}]({article['url']})")
+                else:
+                    st.write("No recent news articles found.")
+            except Exception as e:
+                st.error(f"Error fetching news articles: {e}")
 
             # Explain Algorithms and Models
             with st.expander("How Does This Work?"):
                 st.markdown("""
                 - We use **Prophet**, a robust forecasting model developed by Facebook.
-                - The model predicts future trends based on historical data for GDP growth, inflation, or unemployment.
+                - The model predicts future trends based on historical data for inflation, unemployment, or wage growth.
                 - Recommendations are generated using these forecasts and aligned with your financial inputs.
                 - Investment advice incorporates risk tolerance levels and historical returns.
                 - Scenario comparisons allow users to visualize financial outcomes under various economic conditions.
                 """)
-    
-    # =============================
-    # 10.4. Simulations Tab
-    # =============================
+
+    # Simulations Tab
     with tabs[3]:
         st.header("Simulations: Explore Your Financial Future")
 
@@ -624,6 +539,7 @@ def main():
         # Goal-Based Simulation
         st.markdown("### Goal-Based Simulation")
         goal_amount = st.number_input("Enter Your Financial Goal Amount ($):", value=100000)
+        # Calculate years to reach the goal based on compound interest formula
         if annual_growth_rate > 0:
             years_to_goal = np.log(goal_amount / initial_investment) / np.log(1 + annual_growth_rate / 100)
             years_to_goal = max(years_to_goal, 0)  # Ensure non-negative
@@ -655,67 +571,52 @@ def main():
 
         # Dynamic Visualization
         future_values = [initial_investment * ((1 + adjusted_growth_rate / 100) ** year) for year in range(1, investment_period + 1)]
-        fig = px.line(
-            x=range(1, investment_period + 1),
-            y=future_values,
-            title=f"{scenario} Scenario Growth Over Time",
-            labels={"x": "Year", "y": "Portfolio Value ($)"}
-        )
+        fig = px.line(x=range(1, investment_period + 1), y=future_values, title=f"{scenario} Scenario Growth Over Time", labels={"x": "Year", "y": "Portfolio Value ($)"})
         st.plotly_chart(fig, use_container_width=True)
 
-    # =============================
-    # 10.5. Live Sentiment Tab
-    # =============================
+    # Live Sentiment Tab
     with tabs[4]:
         st.header("Live Sentiment Analysis")
 
         sentiments, avg_sentiment, articles = analyze_sentiment()
-        if sentiments:
-            st.metric("Overall Sentiment Score", f"{avg_sentiment:.2f}")
-        else:
-            st.metric("Overall Sentiment Score", "N/A")
-            st.warning("No sentiment data available.")
+        st.metric("Overall Sentiment Score", f"{avg_sentiment:.2f}")
 
         # Sentiment Distribution Pie Chart
-        if sentiments:
-            sentiment_distribution = {
-                "Positive": sum(1 for s in sentiments if s > 0),
-                "Neutral": sum(1 for s in sentiments if s == 0),
-                "Negative": sum(1 for s in sentiments if s < 0),
-            }
-            fig_pie = px.pie(
-                values=list(sentiment_distribution.values()),
-                names=list(sentiment_distribution.keys()),
-                title="Sentiment Distribution of Latest Articles",
-            )
-            st.plotly_chart(fig_pie, use_container_width=True)
-        else:
-            st.write("No sentiment data available to display.")
+        sentiment_distribution = {
+            "Positive": sum(1 for s in sentiments if s > 0),
+            "Neutral": sum(1 for s in sentiments if s == 0),
+            "Negative": sum(1 for s in sentiments if s < 0),
+        }
+        fig_pie = px.pie(
+            values=list(sentiment_distribution.values()),
+            names=list(sentiment_distribution.keys()),
+            title="Sentiment Distribution of Latest Articles",
+        )
+        st.plotly_chart(fig_pie, use_container_width=True)
 
         # Top Keywords
-        if articles:
-            stop_words = set(stopwords.words("english"))
-            keywords = [
-                word.lower()
-                for article in articles[:5]
-                for word in article["title"].split()
-                if word.lower() not in stop_words and word.isalpha()
-            ]
-            most_common_keywords = Counter(keywords).most_common(10)
-            keywords_str = ", ".join([word for word, freq in most_common_keywords])
-            st.markdown(f"**Top Keywords from Articles:** {keywords_str}")
+        stop_words = set(stopwords.words("english"))
+        keywords = [
+            word.lower()
+            for article in articles[:5]
+            for word in article["title"].split()
+            if word.lower() not in stop_words and word.isalpha()
+        ]
+        most_common_keywords = Counter(keywords).most_common(10)
+        keywords_str = ", ".join([word for word, freq in most_common_keywords])
+        st.markdown(f"**Top Keywords from Articles:** {keywords_str}")
 
-            # Word Cloud
-            if keywords:
-                wordcloud = WordCloud(width=800, height=400, background_color="white").generate(" ".join(keywords))
-                fig, ax = plt.subplots(figsize=(10, 5))
-                ax.imshow(wordcloud, interpolation="bilinear")
-                ax.axis("off")
-                st.pyplot(fig)
-            else:
-                st.write("No keywords available for word cloud.")
+        # Word Cloud
+        if keywords:
+            wordcloud = WordCloud(width=800, height=400, background_color="white").generate(
+                " ".join(keywords)
+            )
+            fig, ax = plt.subplots(figsize=(10, 5))
+            ax.imshow(wordcloud, interpolation="bilinear")
+            ax.axis("off")
+            st.pyplot(fig)
         else:
-            st.write("No articles available.")
+            st.write("No keywords available for word cloud.")
 
         # Top Articles with Links
         st.subheader("Top Articles")
@@ -729,20 +630,12 @@ def main():
         if sentiments:
             dates = pd.date_range(end=pd.Timestamp.now(), periods=len(sentiments))
             timeline_df = pd.DataFrame({"Date": dates, "Sentiment": sentiments})
-            fig_timeline = px.line(
-                timeline_df, 
-                x="Date", 
-                y="Sentiment", 
-                title="Sentiment Over Time",
-                labels={"Date": "Date", "Sentiment": "Sentiment Score"}
-            )
+            fig_timeline = px.line(timeline_df, x="Date", y="Sentiment", title="Sentiment Over Time")
             st.plotly_chart(fig_timeline, use_container_width=True)
         else:
             st.write("No sentiment data available to display.")
 
-    # =============================
-    # 10.6. Generate Report Tab
-    # =============================
+    # Generate Report Tab
     with tabs[5]:
         st.header("Generate Report")
         if st.button("Download Report"):
@@ -750,7 +643,7 @@ def main():
                 generate_pdf(data)
                 with open("economic_report.pdf", "rb") as pdf:
                     st.download_button(
-                        label="📥 Download Report",
+                        label="Download Report",
                         data=pdf,
                         file_name="economic_report.pdf",
                         mime="application/pdf"
@@ -761,16 +654,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
-# =============================
-# 11. Footer
-# =============================
-
-st.markdown(
-    """
-    <div class="footer">
-        © 2024 US Economic Insights. All rights reserved.
-    </div>
-    """,
-    unsafe_allow_html=True
-)

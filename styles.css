@@ -1,0 +1,42 @@
+/* styles.css */
+
+/* Overall page styling */
+body {
+    background-color: #f0f2f6;
+    color: #333333;
+}
+
+/* Header styling */
+h1, h2, h3, h4, h5, h6 {
+    font-family: 'Arial', sans-serif;
+    color: #2c3e50;
+}
+
+/* Customize Streamlit's sidebar */
+.sidebar .sidebar-content {
+    background-color: #ffffff;
+    color: #333333;
+}
+
+/* Metric styling */
+.stMetric {
+    background-color: #ffffff;
+    padding: 10px;
+    border-radius: 5px;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+}
+
+/* Footer styling */
+.footer {
+    position: fixed;
+    left: 0;
+    bottom: 0;
+    width: 100%;
+    background-color: #ffffff;
+    color: #333333;
+    text-align: center;
+    padding: 10px;
+    box-shadow: 0 -2px 5px rgba(0,0,0,0.1);
+}
+
+/* Additional custom styles can be added here */
