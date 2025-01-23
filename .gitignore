@@ -1,0 +1,27 @@
+# Ignore SQLite database
+economic_data.db
+
+# Ignore generated reports
+*.pdf
+
+# Ignore Python cache files
+__pycache__/
+*.pyc
+
+# Ignore log files
+*.log
+nohup.out
+scheduler.log
+
+# Ignore Jupyter Notebook checkpoints
+.ipynb_checkpoints/
+
+# Ignore macOS-specific files
+.DS_Store
+
+# Ignore virtual environments
+venv/
+
+# Ignore unnecessary images or temporary directories
+images/
+
