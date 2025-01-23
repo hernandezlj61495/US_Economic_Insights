@@ -9,3 +9,4 @@ textblob
 matplotlib
 wordcloud
 reportlab
+python-dotenv
